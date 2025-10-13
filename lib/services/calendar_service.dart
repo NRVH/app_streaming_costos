@@ -161,6 +161,64 @@ class CalendarService {
     }
   }
 
+  /// Obtiene un evento específico
+  Future<Event?> getEvent(String eventId, String calendarId) async {
+    try {
+      final hasPerms = await hasPermissions();
+      if (!hasPerms) return null;
+
+      final result = await _calendarPlugin.retrieveEvents(
+        calendarId,
+        RetrieveEventsParams(
+          eventIds: [eventId],
+        ),
+      );
+
+      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
+        return result.data!.first;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Obtiene todos los eventos de recordatorios de suscripciones
+  Future<List<Event>> getSubscriptionEvents(String calendarId) async {
+    try {
+      final hasPerms = await hasPermissions();
+      if (!hasPerms) return [];
+
+      final now = DateTime.now();
+      final start = tz.TZDateTime.from(now.subtract(const Duration(days: 30)), local);
+      final end = tz.TZDateTime.from(now.add(const Duration(days: 90)), local);
+
+      final result = await _calendarPlugin.retrieveEvents(
+        calendarId,
+        RetrieveEventsParams(
+          startDate: start,
+          endDate: end,
+        ),
+      );
+
+      if (result.isSuccess && result.data != null) {
+        // Filtrar solo eventos que contengan "Pago de" en el título
+        return result.data!
+            .where((event) => event.title?.startsWith('Pago de ') ?? false)
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Verifica si un evento existe
+  Future<bool> eventExists(String eventId, String calendarId) async {
+    final event = await getEvent(eventId, calendarId);
+    return event != null;
+  }
+
   /// Formatea una fecha
   String _formatDate(DateTime date) {
     final day = date.day.toString().padLeft(2, '0');

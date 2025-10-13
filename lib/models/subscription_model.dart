@@ -43,6 +43,9 @@ class Subscription extends HiveObject {
   @HiveField(12)
   String? calendarEventId;
 
+  @HiveField(13)
+  String? calendarId;
+
   Subscription({
     required this.id,
     required this.name,
@@ -57,6 +60,7 @@ class Subscription extends HiveObject {
     this.notes,
     required this.createdAt,
     this.calendarEventId,
+    this.calendarId,
   });
 
   /// Obtiene la próxima fecha de cobro

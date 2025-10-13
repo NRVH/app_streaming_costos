@@ -6,6 +6,7 @@ import '../providers/subscriptions_provider.dart';
 import '../core/constants/app_constants.dart';
 import '../widgets/subscription_card.dart';
 import '../widgets/empty_state_widget.dart';
+import '../widgets/update_badge.dart';
 import 'add_edit_subscription_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -26,6 +27,7 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Mis Suscripciones'),
         actions: [
+          const UpdateBadge(),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {

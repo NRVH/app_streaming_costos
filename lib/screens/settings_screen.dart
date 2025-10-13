@@ -3,9 +3,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_provider.dart';
 import '../core/constants/app_constants.dart';
+import '../providers/update_provider.dart';
+import '../services/update_service.dart';
+import '../widgets/update_dialog.dart';
+import 'calendar_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
+
+  String _formatLastChecked(DateTime lastChecked) {
+    final now = DateTime.now();
+    final difference = now.difference(lastChecked);
+
+    if (difference.inMinutes < 1) {
+      return 'Hace un momento';
+    } else if (difference.inHours < 1) {
+      return 'Hace ${difference.inMinutes} min';
+    } else if (difference.inDays < 1) {
+      return 'Hace ${difference.inHours} h';
+    } else {
+      return 'Hace ${difference.inDays} días';
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -49,11 +68,87 @@ class SettingsScreen extends ConsumerWidget {
             title: const Text('Versión'),
             subtitle: Text(AppConstants.appVersion),
           ),
+          Consumer(
+            builder: (context, ref, child) {
+              final updateState = ref.watch(updateProvider);
+              final isChecking = updateState.isChecking;
+
+              return ListTile(
+                leading: isChecking
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Badge(
+                        isLabelVisible: updateState.hasUpdate,
+                        backgroundColor: Colors.amber,
+                        label: const Text('1'),
+                        child: const Icon(Icons.system_update),
+                      ),
+                title: const Text('Buscar actualizaciones'),
+                subtitle: updateState.hasUpdate
+                    ? Text(
+                        'Versión ${updateState.availableUpdate!.version} disponible',
+                        style: const TextStyle(color: Colors.amber),
+                      )
+                    : updateState.lastChecked != null
+                        ? Text('Última verificación: ${_formatLastChecked(updateState.lastChecked!)}')
+                        : const Text('Verifica si hay nuevas versiones'),
+                trailing: isChecking
+                    ? null
+                    : const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: isChecking
+                    ? null
+                    : () async {
+                        await ref.read(updateProvider.notifier).checkForUpdates();
+                        final state = ref.read(updateProvider);
+                        
+                        if (context.mounted) {
+                          if (state.hasUpdate) {
+                            final updateService = UpdateService();
+                            final currentVersion = await updateService.getCurrentVersion();
+                            showUpdateDialog(
+                              context,
+                              state.availableUpdate!,
+                              currentVersion,
+                            );
+                          } else if (!state.hasError) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Ya tienes la versión más reciente'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        }
+                      },
+              );
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.description_outlined),
             title: const Text('Acerca de'),
             subtitle: const Text('Aplicación de gestión de suscripciones'),
             onTap: () => _showAboutDialog(context),
+          ),
+          const Divider(),
+
+          // Recordatorios
+          const SectionHeader(title: 'Recordatorios'),
+          ListTile(
+            leading: const Icon(Icons.event_note_outlined),
+            title: const Text('Gestionar recordatorios'),
+            subtitle: const Text('Ver y sincronizar eventos del calendario'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CalendarScreen(),
+                ),
+              );
+            },
           ),
           const Divider(),
 

@@ -454,7 +454,42 @@ class _AddEditSubscriptionScreenState extends ConsumerState<AddEditSubscriptionS
         final hasPermissions = await calendarService.hasPermissions();
         
         if (hasPermissions || await calendarService.requestPermissions()) {
-          await calendarService.createReminder(subscription);
+          final calendarId = await calendarService.getDefaultCalendarId();
+          
+          if (calendarId != null) {
+            // Si existe un evento anterior, eliminarlo
+            if (subscription.calendarEventId != null && subscription.calendarId != null) {
+              await calendarService.deleteReminder(
+                subscription.calendarEventId!,
+                calendarId: subscription.calendarId,
+              );
+            }
+            
+            // Crear nuevo recordatorio
+            final eventId = await calendarService.createReminder(
+              subscription,
+              calendarId: calendarId,
+            );
+            
+            if (eventId != null) {
+              // Actualizar la suscripción con los IDs del calendario
+              subscription.calendarEventId = eventId;
+              subscription.calendarId = calendarId;
+              await ref.read(subscriptionsProvider.notifier).updateSubscription(subscription);
+            }
+          }
+        }
+      } else {
+        // Si se deshabilitó el recordatorio y existe uno, eliminarlo
+        if (subscription.calendarEventId != null && subscription.calendarId != null) {
+          final calendarService = CalendarService();
+          await calendarService.deleteReminder(
+            subscription.calendarEventId!,
+            calendarId: subscription.calendarId,
+          );
+          subscription.calendarEventId = null;
+          subscription.calendarId = null;
+          await ref.read(subscriptionsProvider.notifier).updateSubscription(subscription);
         }
       }
 

@@ -30,13 +30,14 @@ class SubscriptionAdapter extends TypeAdapter<Subscription> {
       notes: fields[10] as String?,
       createdAt: fields[11] as DateTime,
       calendarEventId: fields[12] as String?,
+      calendarId: fields[13] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Subscription obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -62,7 +63,9 @@ class SubscriptionAdapter extends TypeAdapter<Subscription> {
       ..writeByte(11)
       ..write(obj.createdAt)
       ..writeByte(12)
-      ..write(obj.calendarEventId);
+      ..write(obj.calendarEventId)
+      ..writeByte(13)
+      ..write(obj.calendarId);
   }
 
   @override
