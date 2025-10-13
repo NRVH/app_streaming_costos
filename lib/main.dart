@@ -1,0 +1,107 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'core/theme/app_theme.dart';
+import 'core/theme/theme_provider.dart';
+import 'services/database_service.dart';
+import 'screens/home_screen.dart';
+import 'screens/summary_screen.dart';
+import 'screens/settings_screen.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializar timezone
+  tz.initializeTimeZones();
+  
+  // Inicializar base de datos
+  await DatabaseService.init();
+  
+  // Configurar orientación (solo portrait para móvil)
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
+}
+
+class MyApp extends ConsumerWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDarkMode = ref.watch(themeModeProvider);
+    final colorScheme = ref.watch(colorSchemeProvider);
+
+    return MaterialApp(
+      title: 'Mis Suscripciones',
+      debugShowCheckedModeBanner: false,
+      
+      // Temas
+      theme: AppTheme.getLightTheme(colorScheme),
+      darkTheme: AppTheme.getDarkTheme(colorScheme),
+      themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      
+      // Pantalla principal
+      home: const MainNavigationScreen(),
+    );
+  }
+}
+
+class MainNavigationScreen extends StatefulWidget {
+  const MainNavigationScreen({super.key});
+
+  @override
+  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+}
+
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  int _currentIndex = 0;
+
+  final List<Widget> _screens = const [
+    HomeScreen(),
+    SummaryScreen(),
+    SettingsScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Inicio',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.assessment_outlined),
+            selectedIcon: Icon(Icons.assessment),
+            label: 'Resumen',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Ajustes',
+          ),
+        ],
+      ),
+    );
+  }
+}
