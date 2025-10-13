@@ -91,6 +91,8 @@ class UpdateService {
   /// Verifica si hay una actualización disponible
   Future<GithubRelease?> checkForUpdate() async {
     try {
+      print('🔍 Verificando actualizaciones en: $_apiUrl');
+      
       final response = await http.get(
         Uri.parse(_apiUrl),
         headers: {
@@ -100,25 +102,41 @@ class UpdateService {
         const Duration(seconds: 10),
       );
 
+      print('📡 Status Code: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
         final release = GithubRelease.fromJson(json);
 
+        print('📦 Release encontrada: ${release.tagName}');
+        print('🔖 Version release: ${release.version}');
+
         // No mostrar pre-releases
         if (release.prerelease) {
+          print('⚠️ Es pre-release, ignorando');
           return null;
         }
 
         // Comparar versiones
         final currentVersion = await getCurrentVersion();
-        if (_isNewerVersion(release.version, currentVersion)) {
+        print('📱 Versión actual: $currentVersion');
+        
+        final isNewer = _isNewerVersion(release.version, currentVersion);
+        print('🔄 ¿Es más nueva? $isNewer');
+        
+        if (isNewer) {
+          print('✅ Actualización disponible: $currentVersion → ${release.version}');
           return release;
+        } else {
+          print('✅ Ya tienes la última versión');
         }
+      } else {
+        print('❌ Error HTTP: ${response.statusCode}');
       }
 
       return null;
     } catch (e) {
-      // Error de red o parsing - no hay actualización disponible
+      print('❌ Error al verificar actualizaciones: $e');
       return null;
     }
   }

@@ -128,6 +128,39 @@ class UpdateDialog extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
+            // Advertencia de respaldo
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.blue.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Colors.blue,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Tus datos están seguros. Al actualizar, todas tus suscripciones y configuraciones se mantendrán intactas.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.blue[700],
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // Notas de la versión
             Text(
               'Novedades',
