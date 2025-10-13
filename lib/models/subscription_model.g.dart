@@ -31,13 +31,19 @@ class SubscriptionAdapter extends TypeAdapter<Subscription> {
       createdAt: fields[11] as DateTime,
       calendarEventId: fields[12] as String?,
       calendarId: fields[13] as String?,
+      lastPaymentDate: fields[14] as DateTime?,
+      reminderHour: fields[15] as int?,
+      reminderMinute: fields[16] as int?,
+      reminderAllDay: fields[17] as bool,
+      status: fields[18] as SubscriptionStatus,
+      subscriptionEndDate: fields[19] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Subscription obj) {
     writer
-      ..writeByte(14)
+      ..writeByte(20)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -65,7 +71,19 @@ class SubscriptionAdapter extends TypeAdapter<Subscription> {
       ..writeByte(12)
       ..write(obj.calendarEventId)
       ..writeByte(13)
-      ..write(obj.calendarId);
+      ..write(obj.calendarId)
+      ..writeByte(14)
+      ..write(obj.lastPaymentDate)
+      ..writeByte(15)
+      ..write(obj.reminderHour)
+      ..writeByte(16)
+      ..write(obj.reminderMinute)
+      ..writeByte(17)
+      ..write(obj.reminderAllDay)
+      ..writeByte(18)
+      ..write(obj.status)
+      ..writeByte(19)
+      ..write(obj.subscriptionEndDate);
   }
 
   @override
@@ -75,6 +93,50 @@ class SubscriptionAdapter extends TypeAdapter<Subscription> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is SubscriptionAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class SubscriptionStatusAdapter extends TypeAdapter<SubscriptionStatus> {
+  @override
+  final int typeId = 2;
+
+  @override
+  SubscriptionStatus read(BinaryReader reader) {
+    switch (reader.readByte()) {
+      case 0:
+        return SubscriptionStatus.active;
+      case 1:
+        return SubscriptionStatus.paused;
+      case 2:
+        return SubscriptionStatus.canceled;
+      default:
+        return SubscriptionStatus.active;
+    }
+  }
+
+  @override
+  void write(BinaryWriter writer, SubscriptionStatus obj) {
+    switch (obj) {
+      case SubscriptionStatus.active:
+        writer.writeByte(0);
+        break;
+      case SubscriptionStatus.paused:
+        writer.writeByte(1);
+        break;
+      case SubscriptionStatus.canceled:
+        writer.writeByte(2);
+        break;
+    }
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SubscriptionStatusAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

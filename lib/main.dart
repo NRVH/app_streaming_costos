@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'core/theme/app_theme.dart';
-import 'core/theme/theme_provider.dart';
+import 'providers/theme_provider.dart';
 import 'services/database_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/summary_screen.dart';
@@ -36,17 +36,29 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDarkMode = ref.watch(themeModeProvider);
-    final colorScheme = ref.watch(colorSchemeProvider);
+    final themePrefs = ref.watch(themePreferencesProvider);
+    final themeNotifier = ref.read(themePreferencesProvider.notifier);
+    
+    // Obtener el brightness del sistema
+    final systemBrightness = MediaQuery.platformBrightnessOf(context);
+    final currentBrightness = themeNotifier.getCurrentBrightness(systemBrightness);
 
     return MaterialApp(
       title: 'Mis Suscripciones',
       debugShowCheckedModeBanner: false,
       
       // Temas
-      theme: AppTheme.getLightTheme(colorScheme),
-      darkTheme: AppTheme.getDarkTheme(colorScheme),
-      themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      theme: AppTheme.getLightTheme(
+        useAmoled: false,
+        useDynamicColor: themePrefs.useDynamicColor,
+      ),
+      darkTheme: AppTheme.getDarkTheme(
+        useAmoled: themePrefs.useAmoledMode,
+        useDynamicColor: themePrefs.useDynamicColor,
+      ),
+      themeMode: currentBrightness == Brightness.dark 
+          ? ThemeMode.dark 
+          : ThemeMode.light,
       
       // Pantalla principal
       home: const MainNavigationScreen(),

@@ -90,12 +90,41 @@ class CalendarService {
       print('📅 [CREATE] Usando calendario ID: $calId');
 
       final nextBillingDate = subscription.getNextBillingDate();
-      final reminderDate = nextBillingDate.subtract(
+      var reminderDate = nextBillingDate.subtract(
         Duration(days: subscription.reminderDaysBefore),
       );
       
+      // Si tiene hora específica configurada, usarla
+      if (!subscription.reminderAllDay && subscription.reminderHour != null) {
+        reminderDate = DateTime(
+          reminderDate.year,
+          reminderDate.month,
+          reminderDate.day,
+          subscription.reminderHour!,
+          subscription.reminderMinute ?? 0,
+        );
+      }
+      
       print('📅 [CREATE] Fecha de recordatorio: $reminderDate');
       print('📅 [CREATE] Fecha de cobro: $nextBillingDate');
+      print('📅 [CREATE] Todo el día: ${subscription.reminderAllDay}');
+
+      // Para eventos de todo el día, usar medianoche en hora local
+      DateTime eventStart;
+      DateTime eventEnd;
+      
+      if (subscription.reminderAllDay) {
+        // Todo el día: usar fecha sin hora (medianoche)
+        eventStart = DateTime(reminderDate.year, reminderDate.month, reminderDate.day);
+        eventEnd = DateTime(reminderDate.year, reminderDate.month, reminderDate.day, 23, 59);
+      } else {
+        // Hora específica: usar la hora configurada
+        eventStart = reminderDate;
+        eventEnd = reminderDate.add(const Duration(hours: 1));
+      }
+
+      print('📅 [CREATE] Event start: $eventStart');
+      print('📅 [CREATE] Event end: $eventEnd');
 
       final event = Event(
         calId,
@@ -105,12 +134,31 @@ class CalendarService {
             '📅 Fecha de cobro: ${_formatDate(nextBillingDate)}\n'
             '🔄 Ciclo: ${_getBillingCycleName(subscription.billingCycle)}\n'
             '\n⚠️ Este recordatorio fue creado automáticamente por SubTrack',
-        start: tz.TZDateTime.from(reminderDate, local),
-        end: tz.TZDateTime.from(
-          reminderDate.add(const Duration(hours: 1)),
-          local,
-        ),
-        allDay: false,
+        start: tz.TZDateTime.from(eventStart, local),
+        end: tz.TZDateTime.from(eventEnd, local),
+        allDay: subscription.reminderAllDay,
+      );
+
+      // Agregar RECURRENCIA MENSUAL (cada mes en el mismo día)
+      // Calcular total de ocurrencias basado en fecha de fin
+      int totalOccurrences;
+      if (subscription.subscriptionEndDate != null) {
+        // Calcular meses entre ahora y fecha de fin
+        final now = DateTime.now();
+        final endDate = subscription.subscriptionEndDate!;
+        final monthsDiff = (endDate.year - now.year) * 12 + (endDate.month - now.month);
+        totalOccurrences = monthsDiff > 0 ? monthsDiff + 1 : 1;
+        print('📅 [CREATE] Creando $totalOccurrences recordatorios hasta ${_formatDate(endDate)}');
+      } else {
+        // Sin fecha de fin = indefinido (hasta 5 años por seguridad)
+        totalOccurrences = 60; // Máximo 5 años
+        print('📅 [CREATE] Creando $totalOccurrences recordatorios (indefinido, máx 5 años)');
+      }
+      
+      event.recurrenceRule = RecurrenceRule(
+        RecurrenceFrequency.Monthly,
+        interval: 1,
+        totalOccurrences: totalOccurrences,
       );
 
       // Agregar alarmas múltiples para asegurar notificación
@@ -251,35 +299,25 @@ class CalendarService {
           print('  📌 "${event.title}" (${event.start})');
         }
         
-        // Filtrar eventos de SubTrack con múltiples criterios
+        // Filtrar eventos de SubTrack ESTRICTAMENTE
+        // Solo eventos que tengan nuestra firma única en la descripción
         final filtered = result.data!
             .where((event) {
-              final title = event.title?.toLowerCase() ?? '';
-              final description = event.description?.toLowerCase() ?? '';
+              final title = event.title ?? '';
+              final description = event.description ?? '';
               
-              // Buscar múltiples indicadores de eventos de SubTrack
-              final matches = 
-                     // Por emoji en el título
-                     title.contains('💳') ||
-                     title.contains('💰') ||
-                     // Por texto en título
-                     title.contains('pago') ||
-                     title.contains('suscripción') ||
-                     title.contains('suscripcion') ||
-                     // Por descripción
-                     description.contains('subtrack') ||
-                     description.contains('recordatorio subtrack') ||
-                     description.contains('suscripción') ||
-                     description.contains('suscripcion') ||
-                     // Por patrón de fecha de cobro
-                     description.contains('fecha de cobro') ||
-                     description.contains('ciclo:');
+              // CRITERIO ESTRICTO: Debe tener el emoji 💳 en el título
+              // Y la firma única de SubTrack en la descripción
+              final hasSubTrackSignature = title.contains('💳') && 
+                     description.contains('Este recordatorio fue creado automáticamente por SubTrack');
               
-              if (matches) {
-                print('  ✅ "${event.title}" → Coincide con filtro');
+              if (hasSubTrackSignature) {
+                print('  ✅ "${event.title}" → Evento de SubTrack verificado');
+              } else {
+                print('  ⏭️ "${event.title}" → NO es de SubTrack');
               }
               
-              return matches;
+              return hasSubTrackSignature;
             })
             .toList();
         

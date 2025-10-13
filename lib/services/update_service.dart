@@ -91,7 +91,15 @@ class UpdateService {
   /// Verifica si hay una actualización disponible
   Future<GithubRelease?> checkForUpdate() async {
     try {
-      print('🔍 Verificando actualizaciones en: $_apiUrl');
+      // Obtener y mostrar versión actual PRIMERO
+      final currentVersion = await getCurrentVersion();
+      final buildNumber = await getCurrentBuildNumber();
+      print('');
+      print('═══════════════════════════════════════');
+      print('🔍 VERIFICACIÓN DE ACTUALIZACIONES');
+      print('═══════════════════════════════════════');
+      print('📱 Versión instalada: $currentVersion (build $buildNumber)');
+      print('🌐 Consultando: $_apiUrl');
       
       final response = await http.get(
         Uri.parse(_apiUrl),
@@ -99,44 +107,61 @@ class UpdateService {
           'Accept': 'application/vnd.github.v3+json',
         },
       ).timeout(
-        const Duration(seconds: 10),
+        const Duration(seconds: 15),
       );
 
-      print('📡 Status Code: ${response.statusCode}');
+      print('📡 Status HTTP: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
         final release = GithubRelease.fromJson(json);
 
-        print('📦 Release encontrada: ${release.tagName}');
-        print('🔖 Version release: ${release.version}');
+        print('📦 Release en GitHub:');
+        print('   - Tag: ${release.tagName}');
+        print('   - Versión: ${release.version}');
+        print('   - Es pre-release: ${release.prerelease}');
+        print('   - Fecha: ${release.publishedAt}');
 
         // No mostrar pre-releases
         if (release.prerelease) {
-          print('⚠️ Es pre-release, ignorando');
+          print('⚠️  Pre-release detectado, ignorando');
+          print('═══════════════════════════════════════');
           return null;
         }
 
         // Comparar versiones
-        final currentVersion = await getCurrentVersion();
-        print('📱 Versión actual: $currentVersion');
-        
         final isNewer = _isNewerVersion(release.version, currentVersion);
-        print('🔄 ¿Es más nueva? $isNewer');
+        print('');
+        print('� COMPARACIÓN:');
+        print('   Instalada: $currentVersion');
+        print('   Disponible: ${release.version}');
+        print('   ¿Es más nueva?: $isNewer');
         
         if (isNewer) {
-          print('✅ Actualización disponible: $currentVersion → ${release.version}');
+          print('');
+          print('✅ ACTUALIZACIÓN DISPONIBLE');
+          print('   $currentVersion → ${release.version}');
+          print('═══════════════════════════════════════');
           return release;
         } else {
-          print('✅ Ya tienes la última versión');
+          print('');
+          print('✅ YA TIENES LA ÚLTIMA VERSIÓN');
+          print('═══════════════════════════════════════');
         }
       } else {
         print('❌ Error HTTP: ${response.statusCode}');
+        print('   Respuesta: ${response.body}');
+        print('═══════════════════════════════════════');
       }
 
       return null;
-    } catch (e) {
-      print('❌ Error al verificar actualizaciones: $e');
+    } catch (e, stackTrace) {
+      print('');
+      print('❌ ERROR AL VERIFICAR ACTUALIZACIONES');
+      print('   Tipo: ${e.runtimeType}');
+      print('   Mensaje: $e');
+      print('   Stack: ${stackTrace.toString().split('\n').take(3).join('\n')}');
+      print('═══════════════════════════════════════');
       return null;
     }
   }

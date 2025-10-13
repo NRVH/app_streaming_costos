@@ -76,7 +76,11 @@ class AppTheme {
   }
 
   /// Genera el tema claro
-  static ThemeData getLightTheme(AppColorScheme colorScheme) {
+  static ThemeData getLightTheme({
+    AppColorScheme colorScheme = AppColorScheme.sakuraPink,
+    bool useAmoled = false,
+    bool useDynamicColor = false,
+  }) {
     final palette = getPalette(colorScheme);
     final colorSchemeData = ColorScheme.fromSeed(
       seedColor: palette.primary,
@@ -158,13 +162,24 @@ class AppTheme {
   }
 
   /// Genera el tema oscuro
-  static ThemeData getDarkTheme(AppColorScheme colorScheme) {
+  static ThemeData getDarkTheme({
+    AppColorScheme colorScheme = AppColorScheme.sakuraPink,
+    bool useAmoled = false,
+    bool useDynamicColor = false,
+  }) {
     final palette = getPalette(colorScheme);
+    
+    // Si es modo AMOLED, usar negro puro
+    final backgroundColor = useAmoled ? Colors.black : null;
+    final surfaceColor = useAmoled ? const Color(0xFF0A0A0A) : null;
+    
     final colorSchemeData = ColorScheme.fromSeed(
       seedColor: palette.primary,
       secondary: palette.secondary,
       tertiary: palette.tertiary,
       brightness: Brightness.dark,
+      surface: surfaceColor,
+      background: backgroundColor,
     );
 
     return ThemeData(

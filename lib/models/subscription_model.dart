@@ -46,6 +46,24 @@ class Subscription extends HiveObject {
   @HiveField(13)
   String? calendarId;
 
+  @HiveField(14)
+  DateTime? lastPaymentDate;
+
+  @HiveField(15)
+  int? reminderHour; // Hora del recordatorio (0-23), null = todo el día
+
+  @HiveField(16)
+  int? reminderMinute; // Minuto del recordatorio (0-59)
+
+  @HiveField(17)
+  bool reminderAllDay; // true = recordatorio todo el día
+
+  @HiveField(18)
+  SubscriptionStatus status; // Estado: activa, pausada, cancelada
+
+  @HiveField(19)
+  DateTime? subscriptionEndDate; // Fecha de fin de suscripción (null = indefinida)
+
   Subscription({
     required this.id,
     required this.name,
@@ -61,6 +79,12 @@ class Subscription extends HiveObject {
     required this.createdAt,
     this.calendarEventId,
     this.calendarId,
+    this.lastPaymentDate,
+    this.reminderHour,
+    this.reminderMinute,
+    this.reminderAllDay = false,
+    this.status = SubscriptionStatus.active,
+    this.subscriptionEndDate,
   });
 
   /// Obtiene la próxima fecha de cobro
@@ -124,6 +148,76 @@ class Subscription extends HiveObject {
     return nextDate.difference(DateTime.now()).inDays;
   }
 
+  /// Marca la suscripción como pagada en la fecha actual
+  void markAsPaid() {
+    lastPaymentDate = DateTime.now();
+  }
+
+  /// Desmarca la suscripción como pagada (revierte el pago)
+  void unmarkAsPaid() {
+    lastPaymentDate = null;
+  }
+
+  /// Cancela la suscripción
+  void cancel() {
+    status = SubscriptionStatus.canceled;
+  }
+
+  /// Renueva la suscripción (de cancelada/pausada a activa)
+  void renew({DateTime? newEndDate}) {
+    status = SubscriptionStatus.active;
+    subscriptionEndDate = newEndDate;
+  }
+
+  /// Pausa la suscripción
+  void pause() {
+    status = SubscriptionStatus.paused;
+  }
+
+  /// Verifica si la suscripción está activa
+  bool get isActive => status == SubscriptionStatus.active;
+
+  /// Verifica si la suscripción está cancelada
+  bool get isCanceled => status == SubscriptionStatus.canceled;
+
+  /// Verifica si la suscripción está pausada
+  bool get isPaused => status == SubscriptionStatus.paused;
+
+  /// Verifica si la suscripción ha expirado (pasó la fecha de fin)
+  bool get isExpired {
+    if (subscriptionEndDate == null) return false;
+    return DateTime.now().isAfter(subscriptionEndDate!);
+  }
+
+  /// Verifica si la suscripción fue pagada este mes/ciclo
+  bool isPaidThisCycle() {
+    if (lastPaymentDate == null) return false;
+    
+    final nextBilling = getNextBillingDate();
+    final lastBilling = _getPreviousBillingDate(nextBilling);
+    
+    return lastPaymentDate!.isAfter(lastBilling) && 
+           lastPaymentDate!.isBefore(nextBilling);
+  }
+
+  /// Obtiene la fecha del cobro anterior
+  DateTime getPreviousBillingDate(DateTime fromDate) {
+    switch (billingCycle) {
+      case BillingCycle.monthly:
+        return DateTime(fromDate.year, fromDate.month - 1, fromDate.day);
+      case BillingCycle.quarterly:
+        return DateTime(fromDate.year, fromDate.month - 3, fromDate.day);
+      case BillingCycle.semiannual:
+        return DateTime(fromDate.year, fromDate.month - 6, fromDate.day);
+      case BillingCycle.annual:
+        return DateTime(fromDate.year - 1, fromDate.month, fromDate.day);
+    }
+  }
+
+  DateTime _getPreviousBillingDate(DateTime fromDate) {
+    return getPreviousBillingDate(fromDate);
+  }
+
   /// Copia la suscripción con valores modificados
   Subscription copyWith({
     String? id,
@@ -139,6 +233,13 @@ class Subscription extends HiveObject {
     String? notes,
     DateTime? createdAt,
     String? calendarEventId,
+    String? calendarId,
+    DateTime? lastPaymentDate,
+    int? reminderHour,
+    int? reminderMinute,
+    bool? reminderAllDay,
+    SubscriptionStatus? status,
+    DateTime? subscriptionEndDate,
   }) {
     return Subscription(
       id: id ?? this.id,
@@ -154,7 +255,50 @@ class Subscription extends HiveObject {
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       calendarEventId: calendarEventId ?? this.calendarEventId,
+      calendarId: calendarId ?? this.calendarId,
+      lastPaymentDate: lastPaymentDate ?? this.lastPaymentDate,
+      reminderHour: reminderHour ?? this.reminderHour,
+      reminderMinute: reminderMinute ?? this.reminderMinute,
+      reminderAllDay: reminderAllDay ?? this.reminderAllDay,
+      status: status ?? this.status,
+      subscriptionEndDate: subscriptionEndDate ?? this.subscriptionEndDate,
     );
+  }
+}
+
+@HiveType(typeId: 2)
+enum SubscriptionStatus {
+  @HiveField(0)
+  active, // Activa
+
+  @HiveField(1)
+  paused, // Pausada
+
+  @HiveField(2)
+  canceled, // Cancelada/Archivada
+}
+
+extension SubscriptionStatusExtension on SubscriptionStatus {
+  String get displayName {
+    switch (this) {
+      case SubscriptionStatus.active:
+        return 'Activa';
+      case SubscriptionStatus.paused:
+        return 'Pausada';
+      case SubscriptionStatus.canceled:
+        return 'Cancelada';
+    }
+  }
+
+  String get emoji {
+    switch (this) {
+      case SubscriptionStatus.active:
+        return '✅';
+      case SubscriptionStatus.paused:
+        return '⏸️';
+      case SubscriptionStatus.canceled:
+        return '❌';
+    }
   }
 }
 

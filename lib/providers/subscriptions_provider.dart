@@ -44,9 +44,11 @@ class SubscriptionsNotifier extends StateNotifier<List<Subscription>> {
     return _box.get(id);
   }
 
-  /// Obtiene el total mensual de todas las suscripciones
+  /// Obtiene el total mensual de todas las suscripciones activas
   double getTotalMonthlyCost() {
-    return state.fold(0.0, (sum, sub) => sum + sub.getMonthlyCost());
+    return state
+        .where((sub) => sub.isActive)
+        .fold(0.0, (sum, sub) => sum + sub.getMonthlyCost());
   }
 
   /// Obtiene las suscripciones ordenadas por próximo cobro

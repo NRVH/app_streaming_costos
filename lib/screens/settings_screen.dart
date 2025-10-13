@@ -7,6 +7,7 @@ import '../providers/update_provider.dart';
 import '../services/update_service.dart';
 import '../widgets/update_dialog.dart';
 import 'calendar_screen.dart';
+import 'theme_settings_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -39,25 +40,19 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           // Apariencia
           const SectionHeader(title: 'Apariencia'),
-          SwitchListTile(
-            secondary: Icon(
-              isDarkMode ? Icons.dark_mode : Icons.light_mode,
-            ),
-            title: const Text('Modo oscuro'),
-            subtitle: Text(
-              isDarkMode ? 'Tema oscuro activado' : 'Tema claro activado',
-            ),
-            value: isDarkMode,
-            onChanged: (value) {
-              ref.read(themeModeProvider.notifier).toggleThemeMode();
-            },
-          ),
           ListTile(
-            leading: _buildColorPalettePreview(currentColorScheme, size: 40),
-            title: const Text('Color de tema'),
-            subtitle: Text(AppTheme.getColorSchemeName(currentColorScheme)),
+            leading: const Icon(Icons.palette),
+            title: const Text('Tema y apariencia'),
+            subtitle: const Text('Color, modo oscuro, horarios y más'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () => _showColorSchemeDialog(context, ref, currentColorScheme),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ThemeSettingsScreen(),
+                ),
+              );
+            },
           ),
           const Divider(),
 
@@ -120,10 +115,109 @@ class SettingsScreen extends ConsumerWidget {
                                 backgroundColor: Colors.green,
                               ),
                             );
+                          } else if (state.hasError) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(state.error ?? 'Error desconocido'),
+                                backgroundColor: Colors.red,
+                                action: SnackBarAction(
+                                  label: 'Ver logs',
+                                  onPressed: () {
+                                    // Los logs estarán en la consola
+                                  },
+                                ),
+                              ),
+                            );
                           }
                         }
                       },
               );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.bug_report),
+            title: const Text('Diagnóstico de actualizaciones'),
+            subtitle: const Text('Ver logs detallados del sistema'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () async {
+              final updateService = UpdateService();
+              final packageInfo = await updateService.getCurrentPackageInfo();
+              
+              if (context.mounted) {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Diagnóstico del Sistema'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Información de la App',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text('Nombre: ${packageInfo.appName}'),
+                          Text('Package: ${packageInfo.packageName}'),
+                          Text('Versión: ${packageInfo.version}'),
+                          Text('Build: ${packageInfo.buildNumber}'),
+                          const SizedBox(height: 16),
+                          Text(
+                            'API de GitHub',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('Owner: NRVH'),
+                          const Text('Repo: app_streaming_costos'),
+                          const Text('URL: https://api.github.com/repos/NRVH/app_streaming_costos/releases/latest'),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '💡 Cómo ver los logs:',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  '1. Conecta el dispositivo por USB\n'
+                                  '2. Ejecuta: flutter logs\n'
+                                  '3. Busca las líneas que empiezan con 🔍',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cerrar'),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          ref.read(updateProvider.notifier).checkForUpdates();
+                        },
+                        child: const Text('Verificar Ahora'),
+                      ),
+                    ],
+                  ),
+                );
+              }
             },
           ),
           ListTile(

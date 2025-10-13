@@ -484,6 +484,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       );
     }
 
+    // Si está mostrando todos los eventos, usar vista plana
+    if (_showAllEvents) {
+      return _buildFlatEventsList();
+    }
+
+    // Vista agrupada por suscripción
+    return _buildGroupedEventsList();
+  }
+
+  Widget _buildFlatEventsList() {
     // Ordenar eventos por fecha
     final sortedEvents = List<Event>.from(_events)
       ..sort((a, b) => (a.start ?? DateTime.now()).compareTo(b.start ?? DateTime.now()));
@@ -496,6 +506,308 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         return _buildEventCard(event);
       },
     );
+  }
+
+  Widget _buildGroupedEventsList() {
+    final subscriptions = ref.read(subscriptionsProvider);
+    
+    // Agrupar eventos por suscripción
+    Map<String, List<Event>> grouped = {};
+    
+    for (final event in _events) {
+      final title = event.title ?? '';
+      
+      // Buscar la suscripción correspondiente
+      Subscription? matchedSub;
+      for (final sub in subscriptions) {
+        if (sub.calendarEventId == event.eventId ||
+            title.toLowerCase().contains(sub.name.toLowerCase()) ||
+            title.contains(sub.name)) {
+          matchedSub = sub;
+          break;
+        }
+      }
+      
+      final key = matchedSub?.id ?? 'unknown_${title.hashCode}';
+      grouped.putIfAbsent(key, () => []);
+      grouped[key]!.add(event);
+    }
+
+    // Convertir a lista y ordenar por cantidad de eventos
+    final groupList = grouped.entries.toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: groupList.length,
+      itemBuilder: (context, index) {
+        final entry = groupList[index];
+        final subId = entry.key;
+        final events = entry.value;
+        
+        // Buscar suscripción
+        final subscription = subscriptions.firstWhere(
+          (s) => s.id == subId,
+          orElse: () => Subscription(
+            id: '',
+            name: events.first.title ?? 'Desconocido',
+            price: 0,
+            currency: '',
+            category: '',
+            colorValue: Colors.grey.value,
+            billingDate: DateTime.now(),
+            billingCycle: BillingCycle.monthly,
+            createdAt: DateTime.now(),
+          ),
+        );
+
+        return _buildGroupedCard(subscription, events);
+      },
+    );
+  }
+
+  Widget _buildGroupedCard(Subscription subscription, List<Event> events) {
+    // Ordenar eventos por fecha
+    events.sort((a, b) => (a.start ?? DateTime.now()).compareTo(b.start ?? DateTime.now()));
+    
+    final hasSubscription = subscription.id.isNotEmpty;
+    final color = hasSubscription ? Color(subscription.colorValue) : Colors.grey;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 3,
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        childrenPadding: const EdgeInsets.only(bottom: 8),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color, width: 2),
+          ),
+          child: Icon(
+            Icons.subscriptions,
+            color: color,
+          ),
+        ),
+        title: Text(
+          subscription.name,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 12,
+              runSpacing: 4,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.event, size: 14, color: color),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${events.length} recordatorio${events.length != 1 ? 's' : ''}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: color,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                if (hasSubscription)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.attach_money, size: 14, color: color),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${subscription.currency} ${subscription.price.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ],
+        ),
+        trailing: SizedBox(
+          width: 100,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: color, width: 1),
+                ),
+                child: Text(
+                  '${events.length}',
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              PopupMenuButton<String>(
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.more_vert, size: 20),
+                onSelected: (value) {
+                  if (value == 'delete_all') {
+                    _deleteAllEventsForSubscription(subscription, events);
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'delete_all',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delete_sweep, color: Colors.red, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Eliminar todos (${events.length})',
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        children: events.map((event) => _buildCompactEventCard(event, subscription)).toList(),
+      ),
+    );
+  }
+
+  Widget _buildCompactEventCard(Event event, Subscription subscription) {
+    final start = event.start;
+    final title = event.title ?? 'Sin título';
+
+    return ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      leading: Icon(
+        Icons.event_note,
+        size: 20,
+        color: subscription.id.isNotEmpty
+            ? Color(subscription.colorValue).withOpacity(0.7)
+            : Colors.grey,
+      ),
+      title: start != null
+          ? Text(
+              DateFormat('dd MMM yyyy').format(start),
+              style: const TextStyle(fontSize: 14),
+            )
+          : null,
+      subtitle: event.allDay == true
+          ? const Text('Todo el día', style: TextStyle(fontSize: 11))
+          : start != null
+              ? Text(
+                  DateFormat('HH:mm').format(start),
+                  style: const TextStyle(fontSize: 11),
+                )
+              : null,
+      trailing: IconButton(
+        icon: const Icon(Icons.delete_outline, size: 18),
+        tooltip: 'Eliminar',
+        color: Colors.red,
+        onPressed: () => _deleteEvent(event, subscription),
+      ),
+    );
+  }
+
+  Future<void> _deleteAllEventsForSubscription(Subscription subscription, List<Event> events) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar Todos los Recordatorios'),
+        content: Text(
+          '¿Estás seguro de que deseas eliminar TODOS los ${events.length} recordatorios de "${subscription.name}"?\n\nEsta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar Todos'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      int deleted = 0;
+      int errors = 0;
+
+      for (final event in events) {
+        if (_selectedCalendarId != null && event.eventId != null) {
+          try {
+            await _calendarService.deleteReminder(
+              event.eventId!,
+              calendarId: _selectedCalendarId,
+            );
+            deleted++;
+          } catch (e) {
+            errors++;
+          }
+        }
+      }
+
+      // Actualizar la suscripción si estaba vinculada
+      if (subscription.id.isNotEmpty) {
+        subscription.calendarEventId = null;
+        subscription.calendarId = null;
+        await ref.read(subscriptionsProvider.notifier).updateSubscription(subscription);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$deleted recordatorios eliminados' + (errors > 0 ? ', $errors errores' : '')),
+            backgroundColor: errors > 0 ? Colors.orange : Colors.green,
+          ),
+        );
+      }
+
+      // Recargar eventos
+      await _loadEvents();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al eliminar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Widget _buildEventCard(Event event) {

@@ -7,12 +7,16 @@ class SubscriptionCard extends StatelessWidget {
   final Subscription subscription;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback? onMarkAsPaid;
+  final VoidCallback? onCancel; // Nuevo callback para cancelar
 
   const SubscriptionCard({
     super.key,
     required this.subscription,
     required this.onTap,
     required this.onDelete,
+    this.onMarkAsPaid,
+    this.onCancel,
   });
 
   @override
@@ -110,7 +114,7 @@ class SubscriptionCard extends StatelessWidget {
                 ),
               ),
               
-              // Precio
+              // Precio y acciones
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -127,13 +131,76 @@ class SubscriptionCard extends StatelessWidget {
                           color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                         ),
                   ),
+                  const SizedBox(height: 8),
+                  // Botón para marcar/desmarcar como pagado
+                  if (onMarkAsPaid != null)
+                    subscription.isPaidThisCycle()
+                        ? // Badge "Pagado" clickeable para desmarcar
+                        InkWell(
+                            onTap: onMarkAsPaid,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.green, width: 1),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.check_circle, size: 14, color: Colors.green),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Pagado',
+                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.close, size: 12, color: Colors.green.withOpacity(0.7)),
+                                ],
+                              ),
+                            ),
+                          )
+                        : // Botón "Marcar como Pagado" si NO está pagado
+                        FilledButton.tonalIcon(
+                            onPressed: onMarkAsPaid,
+                            icon: const Icon(Icons.check_circle, size: 18),
+                            label: const Text('Pagado', style: TextStyle(fontSize: 12)),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
                   const SizedBox(height: 4),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 20),
-                    onPressed: onDelete,
-                    color: Theme.of(context).colorScheme.error,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Botón Cancelar (solo si está activa)
+                      if (subscription.isActive && onCancel != null)
+                        IconButton(
+                          icon: const Icon(Icons.block, size: 20),
+                          onPressed: onCancel,
+                          color: Colors.orange,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          tooltip: 'Cancelar suscripción',
+                        ),
+                      if (subscription.isActive && onCancel != null)
+                        const SizedBox(width: 8),
+                      // Botón Eliminar
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 20),
+                        onPressed: onDelete,
+                        color: Theme.of(context).colorScheme.error,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        tooltip: 'Eliminar',
+                      ),
+                    ],
                   ),
                 ],
               ),

@@ -1,5 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/subscription_model.dart';
+import '../models/theme_preferences.dart';
 
 /// Servicio para gestionar la base de datos Hive
 class DatabaseService {
@@ -16,6 +17,15 @@ class DatabaseService {
     }
     if (!Hive.isAdapterRegistered(1)) {
       Hive.registerAdapter(BillingCycleAdapter());
+    }
+    if (!Hive.isAdapterRegistered(2)) {
+      Hive.registerAdapter(SubscriptionStatusAdapter());
+    }
+    if (!Hive.isAdapterRegistered(3)) {
+      Hive.registerAdapter(ThemeModeAdapter());
+    }
+    if (!Hive.isAdapterRegistered(4)) {
+      Hive.registerAdapter(ThemePreferencesAdapter());
     }
 
     // Abrir las cajas
