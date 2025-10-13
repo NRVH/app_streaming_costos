@@ -325,25 +325,77 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   Widget _buildStatsCard(int activeReminders) {
+    // Contar cuántos eventos están vinculados correctamente
+    final subscriptions = ref.read(subscriptionsProvider);
+    int syncedCount = 0;
+    for (final sub in subscriptions) {
+      if (sub.reminderEnabled && sub.calendarEventId != null) {
+        syncedCount++;
+      }
+    }
+    
+    final bool needsSync = activeReminders > _events.length || syncedCount < activeReminders;
+    
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+        child: Column(
           children: [
-            _buildStatItem(
-              'Recordatorios Activos',
-              activeReminders.toString(),
-              Icons.notifications_active,
-              Colors.blue,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatItem(
+                  'Recordatorios\nActivos',
+                  activeReminders.toString(),
+                  Icons.notifications_active,
+                  Colors.blue,
+                ),
+                _buildStatItem(
+                  'Eventos\nSincronizados',
+                  syncedCount.toString(),
+                  Icons.sync,
+                  Colors.purple,
+                ),
+                _buildStatItem(
+                  'En\nCalendario',
+                  _events.length.toString(),
+                  Icons.event,
+                  Colors.green,
+                ),
+              ],
             ),
-            _buildStatItem(
-              'Eventos en Calendario',
-              _events.length.toString(),
-              Icons.event,
-              Colors.green,
-            ),
+            if (needsSync) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Algunos recordatorios necesitan sincronización',
+                        style: TextStyle(
+                          color: Colors.orange[800],
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _syncWithSubscriptions,
+                      child: const Text('Sincronizar'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -373,6 +425,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   Widget _buildEventsList() {
     if (_events.isEmpty) {
+      final subscriptions = ref.read(subscriptionsProvider);
+      final activeReminders = subscriptions.where((s) => s.reminderEnabled).length;
+      
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -386,20 +441,42 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                'No hay eventos de recordatorios',
+                _showAllEvents 
+                    ? 'No hay eventos en este calendario'
+                    : 'No hay eventos de SubTrack',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
               Text(
-                'Los recordatorios que crees aparecerán aquí',
+                _showAllEvents
+                    ? 'Este calendario no tiene eventos en el rango de fechas consultado'
+                    : activeReminders > 0
+                        ? 'Tienes $activeReminders recordatorio(s) activo(s) que no aparecen en el calendario.\n\n¿Quieres sincronizarlos?'
+                        : 'Crea una suscripción con recordatorio activado\ny aparecerá aquí automáticamente',
                 style: Theme.of(context).textTheme.bodySmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              FilledButton.tonalIcon(
-                onPressed: _syncWithSubscriptions,
-                icon: const Icon(Icons.sync),
-                label: const Text('Sincronizar Ahora'),
+              if (!_showAllEvents && activeReminders > 0) ...[
+                FilledButton.icon(
+                  onPressed: _syncWithSubscriptions,
+                  icon: const Icon(Icons.sync),
+                  label: const Text('Sincronizar Ahora'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _showAllEvents = !_showAllEvents;
+                  });
+                  _loadEvents();
+                },
+                icon: Icon(_showAllEvents ? Icons.filter_alt : Icons.filter_alt_off),
+                label: Text(_showAllEvents ? 'Mostrar solo SubTrack' : 'Ver todos los eventos'),
               ),
             ],
           ),
@@ -431,7 +508,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final subscription = subscriptions.firstWhere(
       (s) => s.calendarEventId == event.eventId,
       orElse: () => subscriptions.firstWhere(
-        (s) => title.contains(s.name),
+        (s) => title.toLowerCase().contains(s.name.toLowerCase()) ||
+               title.contains(s.name),
         orElse: () => Subscription(
           id: '',
           name: '',
@@ -447,9 +525,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
 
     final hasSubscription = subscription.id.isNotEmpty;
+    final isSubTrackEvent = description.toLowerCase().contains('subtrack') ||
+                           title.contains('💳') ||
+                           title.contains('💰');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: hasSubscription ? 2 : 1,
       child: ListTile(
         leading: Container(
           width: 48,
@@ -457,29 +539,66 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           decoration: BoxDecoration(
             color: hasSubscription
                 ? Color(subscription.colorValue).withOpacity(0.2)
-                : Theme.of(context).colorScheme.primaryContainer,
+                : isSubTrackEvent
+                    ? Colors.purple.withOpacity(0.1)
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
+            border: hasSubscription
+                ? Border.all(color: Color(subscription.colorValue), width: 2)
+                : null,
           ),
           child: Icon(
-            Icons.event_note,
+            hasSubscription ? Icons.subscriptions : Icons.event_note,
             color: hasSubscription
                 ? Color(subscription.colorValue)
-                : Theme.of(context).colorScheme.primary,
+                : isSubTrackEvent
+                    ? Colors.purple
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            if (hasSubscription)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.green, width: 1),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.link, size: 10, color: Colors.green),
+                    SizedBox(width: 2),
+                    Text(
+                      'Vinculado',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (start != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Icon(
-                    Icons.schedule,
+                    Icons.access_time,
                     size: 14,
                     color: Theme.of(context).colorScheme.secondary,
                   ),
@@ -489,18 +608,42 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.secondary,
                       fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ],
-            if (description.isNotEmpty) ...[
+            if (hasSubscription) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.attach_money,
+                    size: 14,
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${subscription.currency} ${subscription.price.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.secondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (description.isNotEmpty && !_showAllEvents) ...[
               const SizedBox(height: 4),
               Text(
-                description,
-                maxLines: 2,
+                description.split('\n').first,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ],
@@ -510,25 +653,24 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           children: [
             if (hasSubscription)
               IconButton(
-                icon: const Icon(Icons.open_in_new, size: 20),
-                tooltip: 'Ver suscripción',
+                icon: const Icon(Icons.edit, size: 18),
+                tooltip: 'Editar suscripción',
                 onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    '/edit_subscription',
-                    arguments: subscription,
-                  );
+                  // Aquí deberías navegar a la pantalla de edición
+                  Navigator.pop(context);
+                  Navigator.pop(context);
+                  // Y luego abrir la edición
                 },
               ),
             IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20),
+              icon: const Icon(Icons.delete_outline, size: 18),
               tooltip: 'Eliminar recordatorio',
               color: Colors.red,
               onPressed: () => _deleteEvent(event, subscription),
             ),
           ],
         ),
-        isThreeLine: description.isNotEmpty || start != null,
+        isThreeLine: true,
       ),
     );
   }

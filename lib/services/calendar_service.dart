@@ -69,26 +69,42 @@ class CalendarService {
     String? calendarId,
   }) async {
     try {
+      print('📅 [CREATE] Iniciando creación de recordatorio para: ${subscription.name}');
+      
       final hasPerms = await hasPermissions();
       if (!hasPerms) {
+        print('⚠️ [CREATE] Sin permisos, solicitando...');
         final granted = await requestPermissions();
-        if (!granted) return null;
+        if (!granted) {
+          print('❌ [CREATE] Permisos denegados');
+          return null;
+        }
       }
 
       final calId = calendarId ?? await getDefaultCalendarId();
-      if (calId == null) return null;
+      if (calId == null) {
+        print('❌ [CREATE] No se encontró calendario');
+        return null;
+      }
+      
+      print('📅 [CREATE] Usando calendario ID: $calId');
 
       final nextBillingDate = subscription.getNextBillingDate();
       final reminderDate = nextBillingDate.subtract(
         Duration(days: subscription.reminderDaysBefore),
       );
+      
+      print('📅 [CREATE] Fecha de recordatorio: $reminderDate');
+      print('📅 [CREATE] Fecha de cobro: $nextBillingDate');
 
       final event = Event(
         calId,
-        title: 'Pago de ${subscription.name}',
-        description: 'Recordatorio de pago de suscripción\n'
-            'Monto: ${subscription.currency} ${subscription.price.toStringAsFixed(2)}\n'
-            'Fecha de cobro: ${_formatDate(nextBillingDate)}',
+        title: '💳 Pago ${subscription.name}',
+        description: '🔔 Recordatorio SubTrack\n'
+            '💰 Monto: ${subscription.currency} ${subscription.price.toStringAsFixed(2)}\n'
+            '📅 Fecha de cobro: ${_formatDate(nextBillingDate)}\n'
+            '🔄 Ciclo: ${_getBillingCycleName(subscription.billingCycle)}\n'
+            '\n⚠️ Este recordatorio fue creado automáticamente por SubTrack',
         start: tz.TZDateTime.from(reminderDate, local),
         end: tz.TZDateTime.from(
           reminderDate.add(const Duration(hours: 1)),
@@ -97,20 +113,40 @@ class CalendarService {
         allDay: false,
       );
 
-      // Agregar alarma
+      // Agregar alarmas múltiples para asegurar notificación
       event.reminders = [
-        Reminder(minutes: 0), // Alarma al momento del evento
+        Reminder(minutes: 0), // Al momento del evento
+        Reminder(minutes: 60), // 1 hora antes
       ];
 
+      print('📅 [CREATE] Creando evento en calendario...');
       final result = await _calendarPlugin.createOrUpdateEvent(event);
       
       if (result?.isSuccess == true && result?.data != null) {
-        return result!.data;
+        print('✅ [CREATE] Evento creado exitosamente! ID: ${result!.data}');
+        return result.data;
+      } else {
+        print('❌ [CREATE] Fallo al crear evento');
       }
       
       return null;
     } catch (e) {
+      print('❌ [CREATE] Error: $e');
       return null;
+    }
+  }
+  
+  /// Obtiene el nombre del ciclo de facturación
+  String _getBillingCycleName(BillingCycle cycle) {
+    switch (cycle) {
+      case BillingCycle.monthly:
+        return 'Mensual';
+      case BillingCycle.quarterly:
+        return 'Trimestral';
+      case BillingCycle.semiannual:
+        return 'Semestral';
+      case BillingCycle.annual:
+        return 'Anual';
     }
   }
 
@@ -212,27 +248,35 @@ class CalendarService {
         
         // Mostrar todos los eventos para debug
         for (var event in result.data!) {
-          print('  - Título: "${event.title}"');
-          print('    Descripción: "${event.description}"');
-          print('    Fecha: ${event.start}');
-          print('    ID: ${event.eventId}');
-          print('---');
+          print('  📌 "${event.title}" (${event.start})');
         }
         
-        // Filtrar eventos que contengan "Pago de" o que sean de SubTrack
+        // Filtrar eventos de SubTrack con múltiples criterios
         final filtered = result.data!
             .where((event) {
               final title = event.title?.toLowerCase() ?? '';
               final description = event.description?.toLowerCase() ?? '';
               
-              final matches = title.contains('pago de') || 
-                     title.contains('subtrack') ||
+              // Buscar múltiples indicadores de eventos de SubTrack
+              final matches = 
+                     // Por emoji en el título
+                     title.contains('💳') ||
+                     title.contains('💰') ||
+                     // Por texto en título
+                     title.contains('pago') ||
+                     title.contains('suscripción') ||
+                     title.contains('suscripcion') ||
+                     // Por descripción
                      description.contains('subtrack') ||
+                     description.contains('recordatorio subtrack') ||
                      description.contains('suscripción') ||
-                     description.contains('suscripcion');
+                     description.contains('suscripcion') ||
+                     // Por patrón de fecha de cobro
+                     description.contains('fecha de cobro') ||
+                     description.contains('ciclo:');
               
               if (matches) {
-                print('✅ Evento coincide con filtro: "${event.title}"');
+                print('  ✅ "${event.title}" → Coincide con filtro');
               }
               
               return matches;

@@ -449,6 +449,7 @@ class _AddEditSubscriptionScreenState extends ConsumerState<AddEditSubscriptionS
       }
 
       // Crear/actualizar recordatorio en calendario
+      String? calendarMessage;
       if (_reminderEnabled) {
         final calendarService = CalendarService();
         final hasPermissions = await calendarService.hasPermissions();
@@ -476,8 +477,18 @@ class _AddEditSubscriptionScreenState extends ConsumerState<AddEditSubscriptionS
               subscription.calendarEventId = eventId;
               subscription.calendarId = calendarId;
               await ref.read(subscriptionsProvider.notifier).updateSubscription(subscription);
+              
+              final nextDate = subscription.getNextBillingDate();
+              final reminderDate = nextDate.subtract(Duration(days: subscription.reminderDaysBefore));
+              calendarMessage = '✅ Recordatorio creado para el ${reminderDate.day}/${reminderDate.month}/${reminderDate.year}';
+            } else {
+              calendarMessage = '⚠️ No se pudo crear el recordatorio en el calendario';
             }
+          } else {
+            calendarMessage = '⚠️ No se encontró un calendario disponible';
           }
+        } else {
+          calendarMessage = '⚠️ Se requieren permisos de calendario';
         }
       } else {
         // Si se deshabilitó el recordatorio y existe uno, eliminarlo
@@ -495,13 +506,23 @@ class _AddEditSubscriptionScreenState extends ConsumerState<AddEditSubscriptionS
 
       if (mounted) {
         Navigator.pop(context);
+        
+        // Construir mensaje con información del calendario
+        String message = widget.subscription == null
+            ? 'Suscripción agregada'
+            : 'Suscripción actualizada';
+        
+        if (calendarMessage != null) {
+          message += '\n$calendarMessage';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              widget.subscription == null
-                  ? 'Suscripción agregada'
-                  : 'Suscripción actualizada',
-            ),
+            content: Text(message),
+            duration: const Duration(seconds: 4),
+            backgroundColor: calendarMessage?.contains('⚠️') == true 
+                ? Colors.orange 
+                : Colors.green,
           ),
         );
       }
