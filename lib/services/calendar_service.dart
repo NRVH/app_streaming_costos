@@ -190,8 +190,8 @@ class CalendarService {
       if (!hasPerms) return [];
 
       final now = DateTime.now();
-      final start = tz.TZDateTime.from(now.subtract(const Duration(days: 30)), local);
-      final end = tz.TZDateTime.from(now.add(const Duration(days: 90)), local);
+      final start = tz.TZDateTime.from(now.subtract(const Duration(days: 90)), local);
+      final end = tz.TZDateTime.from(now.add(const Duration(days: 180)), local);
 
       final result = await _calendarPlugin.retrieveEvents(
         calendarId,
@@ -202,13 +202,21 @@ class CalendarService {
       );
 
       if (result.isSuccess && result.data != null) {
-        // Filtrar solo eventos que contengan "Pago de" en el título
+        // Filtrar eventos que contengan "Pago de" o que sean de SubTrack
         return result.data!
-            .where((event) => event.title?.startsWith('Pago de ') ?? false)
+            .where((event) {
+              final title = event.title?.toLowerCase() ?? '';
+              final description = event.description?.toLowerCase() ?? '';
+              return title.contains('pago de') || 
+                     title.contains('subtrack') ||
+                     description.contains('subtrack') ||
+                     description.contains('suscripción');
+            })
             .toList();
       }
       return [];
     } catch (e) {
+      print('Error al obtener eventos: $e');
       return [];
     }
   }

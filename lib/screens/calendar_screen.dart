@@ -425,22 +425,100 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             ],
           ],
         ),
-        trailing: hasSubscription
-            ? IconButton(
-                icon: const Icon(Icons.open_in_new),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (hasSubscription)
+              IconButton(
+                icon: const Icon(Icons.open_in_new, size: 20),
                 tooltip: 'Ver suscripción',
                 onPressed: () {
-                  // Navegar a la pantalla de edición
                   Navigator.pushNamed(
                     context,
                     '/edit_subscription',
                     arguments: subscription,
                   );
                 },
-              )
-            : null,
+              ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 20),
+              tooltip: 'Eliminar recordatorio',
+              color: Colors.red,
+              onPressed: () => _deleteEvent(event, subscription),
+            ),
+          ],
+        ),
         isThreeLine: description.isNotEmpty || start != null,
       ),
     );
+  }
+
+  Future<void> _deleteEvent(Event event, Subscription subscription) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar Recordatorio'),
+        content: Text(
+          '¿Estás seguro de que deseas eliminar este recordatorio?\n\n"${event.title}"',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      // Eliminar del calendario
+      if (_selectedCalendarId != null && event.eventId != null) {
+        await _calendarService.deleteReminder(
+          event.eventId!,
+          calendarId: _selectedCalendarId,
+        );
+
+        // Si está vinculado a una suscripción, actualizar la suscripción
+        if (subscription.id.isNotEmpty) {
+          subscription.calendarEventId = null;
+          subscription.calendarId = null;
+          await ref.read(subscriptionsProvider.notifier).updateSubscription(subscription);
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Recordatorio eliminado correctamente'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+
+        // Recargar eventos
+        await _loadEvents();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al eliminar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 }
