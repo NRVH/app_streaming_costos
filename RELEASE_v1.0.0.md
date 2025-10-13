@@ -1,8 +1,8 @@
-# 📦 Release v1.0.0 - Primera Versión Estable
+# 🎉 Release v1.0.0 - Primera Versión Oficial
 
-## 🎉 SubTrack v1.0.0
+## SubTrack v1.0.0
 
-Primera versión estable de **SubTrack**, tu gestor de suscripciones personal.
+**Primera versión oficial de SubTrack** - Tu gestor personal de suscripciones con todas las características que necesitas.
 
 ---
 
