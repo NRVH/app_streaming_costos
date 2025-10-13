@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:device_calendar/device_calendar.dart';
+import 'package:timezone/timezone.dart' as tz;
 import '../services/calendar_service.dart';
 import '../providers/subscriptions_provider.dart';
 import '../models/subscription_model.dart';
@@ -20,6 +21,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   List<Event> _events = [];
   bool _isLoading = true;
   bool _hasPermissions = false;
+  bool _showAllEvents = false; // Nueva opción para mostrar todos los eventos
 
   @override
   void initState() {
@@ -61,12 +63,50 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
     setState(() => _isLoading = true);
 
-    final events = await _calendarService.getSubscriptionEvents(_selectedCalendarId!);
+    List<Event> events;
+    
+    if (_showAllEvents) {
+      // Cargar TODOS los eventos sin filtro
+      print('🔍 Cargando TODOS los eventos (sin filtro)');
+      events = await _loadAllEvents();
+    } else {
+      // Cargar solo eventos de SubTrack (filtrados)
+      print('🔍 Cargando eventos filtrados de SubTrack');
+      events = await _calendarService.getSubscriptionEvents(_selectedCalendarId!);
+    }
 
     setState(() {
       _events = events;
       _isLoading = false;
     });
+  }
+
+  Future<List<Event>> _loadAllEvents() async {
+    try {
+      final hasPerms = await _calendarService.hasPermissions();
+      if (!hasPerms) return [];
+
+      final now = DateTime.now();
+      final start = tz.TZDateTime.from(now.subtract(const Duration(days: 90)), CalendarService.local);
+      final end = tz.TZDateTime.from(now.add(const Duration(days: 365)), CalendarService.local);
+
+      final result = await DeviceCalendarPlugin().retrieveEvents(
+        _selectedCalendarId!,
+        RetrieveEventsParams(
+          startDate: start,
+          endDate: end,
+        ),
+      );
+
+      if (result.isSuccess && result.data != null) {
+        print('📦 Total eventos sin filtro: ${result.data!.length}');
+        return result.data!;
+      }
+      return [];
+    } catch (e) {
+      print('❌ Error: $e');
+      return [];
+    }
   }
 
   Future<void> _syncWithSubscriptions() async {
@@ -144,6 +184,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         title: const Text('Mis Recordatorios'),
         actions: [
           IconButton(
+            icon: Icon(_showAllEvents ? Icons.filter_alt_off : Icons.filter_alt),
+            tooltip: _showAllEvents ? 'Mostrar solo SubTrack' : 'Mostrar todos los eventos',
+            color: _showAllEvents ? Colors.amber : null,
+            onPressed: _isLoading ? null : () {
+              setState(() {
+                _showAllEvents = !_showAllEvents;
+              });
+              _loadEvents();
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.sync),
             tooltip: 'Sincronizar con suscripciones',
             onPressed: _isLoading ? null : _syncWithSubscriptions,
@@ -162,10 +213,39 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               : Column(
                   children: [
                     _buildCalendarSelector(),
+                    if (_showAllEvents) _buildAllEventsWarning(),
                     _buildStatsCard(activeReminders),
                     Expanded(child: _buildEventsList()),
                   ],
                 ),
+    );
+  }
+
+  Widget _buildAllEventsWarning() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.amber.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber, width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, color: Colors.amber, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Mostrando TODOS los eventos del calendario (${_events.length} eventos)',
+              style: const TextStyle(
+                color: Colors.amber,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

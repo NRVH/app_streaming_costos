@@ -187,11 +187,17 @@ class CalendarService {
   Future<List<Event>> getSubscriptionEvents(String calendarId) async {
     try {
       final hasPerms = await hasPermissions();
-      if (!hasPerms) return [];
+      if (!hasPerms) {
+        print('❌ No hay permisos de calendario');
+        return [];
+      }
 
       final now = DateTime.now();
       final start = tz.TZDateTime.from(now.subtract(const Duration(days: 90)), local);
-      final end = tz.TZDateTime.from(now.add(const Duration(days: 180)), local);
+      final end = tz.TZDateTime.from(now.add(const Duration(days: 365)), local);
+
+      print('📅 Buscando eventos en calendario: $calendarId');
+      print('📅 Rango: $start → $end');
 
       final result = await _calendarPlugin.retrieveEvents(
         calendarId,
@@ -202,21 +208,45 @@ class CalendarService {
       );
 
       if (result.isSuccess && result.data != null) {
+        print('📦 Total eventos encontrados: ${result.data!.length}');
+        
+        // Mostrar todos los eventos para debug
+        for (var event in result.data!) {
+          print('  - Título: "${event.title}"');
+          print('    Descripción: "${event.description}"');
+          print('    Fecha: ${event.start}');
+          print('    ID: ${event.eventId}');
+          print('---');
+        }
+        
         // Filtrar eventos que contengan "Pago de" o que sean de SubTrack
-        return result.data!
+        final filtered = result.data!
             .where((event) {
               final title = event.title?.toLowerCase() ?? '';
               final description = event.description?.toLowerCase() ?? '';
-              return title.contains('pago de') || 
+              
+              final matches = title.contains('pago de') || 
                      title.contains('subtrack') ||
                      description.contains('subtrack') ||
-                     description.contains('suscripción');
+                     description.contains('suscripción') ||
+                     description.contains('suscripcion');
+              
+              if (matches) {
+                print('✅ Evento coincide con filtro: "${event.title}"');
+              }
+              
+              return matches;
             })
             .toList();
+        
+        print('✅ Eventos filtrados para SubTrack: ${filtered.length}');
+        return filtered;
       }
+      
+      print('❌ No se pudieron obtener eventos');
       return [];
     } catch (e) {
-      print('Error al obtener eventos: $e');
+      print('❌ Error al obtener eventos: $e');
       return [];
     }
   }
