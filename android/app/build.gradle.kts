@@ -38,16 +38,12 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-
-    applicationVariants.all {
-        val variant = this
-        variant.outputs
-            .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
-            .forEach { output ->
-                val versionName = variant.versionName
-                val outputFileName = "SubTrack-v${versionName}.apk"
-                output.outputFileName = outputFileName
-            }
+    
+    applicationVariants.configureEach {
+        outputs.configureEach {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName = 
+                "SubTrack-v${versionName}.apk"
+        }
     }
 }
 
