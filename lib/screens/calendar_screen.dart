@@ -145,12 +145,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       final activeReminders = subscriptions.where((s) => s.reminderEnabled).toList();
       
       if (activeReminders.isEmpty) {
-        if (mounted) {
-          SnackBarController.showInfo(
-            context,
-            message: 'No hay recordatorios activos para sincronizar',
-          );
-        }
         setState(() => _isLoading = false);
         return;
       }
@@ -200,12 +194,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       }
 
       if (mounted) {
-        if (errors == 0 && synced > 0) {
-          SnackBarController.showSuccess(
-            context,
-            message: 'Sincronización completa: $synced recordatorio${synced != 1 ? 's' : ''} creado${synced != 1 ? 's' : ''}',
-          );
-        } else if (errors > 0 && synced > 0) {
+        if (errors > 0 && synced > 0) {
           SnackBarController.showWarning(
             context,
             message: '$synced creado${synced != 1 ? 's' : ''}, $errors error${errors != 1 ? 'es' : ''}',
@@ -229,11 +218,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 }
               },
             ),
-          );
-        } else if (skipped > 0 && synced == 0) {
-          SnackBarController.showInfo(
-            context,
-            message: 'Todo al día: $skipped recordatorio${skipped != 1 ? 's' : ''} ya sincronizado${skipped != 1 ? 's' : ''}',
           );
         }
       }
@@ -475,13 +459,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       _selectedCalendarId = selected;
                     });
                     await _loadEvents();
-                    
-                    if (mounted) {
-                      SnackBarController.showSuccess(
-                        context,
-                        message: 'Calendario cambiado correctamente',
-                      );
-                    }
                   }
                 },
                 icon: const Icon(Icons.edit, size: 16),
@@ -1024,18 +1001,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         await ref.read(subscriptionsProvider.notifier).updateSubscription(subscription);
       }
 
-      if (mounted) {
-        if (errors > 0) {
-          SnackBarController.showWarning(
-            context,
-            message: '$deleted eliminado${deleted != 1 ? 's' : ''}, $errors error${errors != 1 ? 'es' : ''}',
-          );
-        } else {
-          SnackBarController.showSuccess(
-            context,
-            message: '$deleted recordatorio${deleted != 1 ? 's' : ''} eliminado${deleted != 1 ? 's' : ''}',
-          );
-        }
+      if (mounted && errors > 0) {
+        SnackBarController.showWarning(
+          context,
+          message: '$deleted eliminado${deleted != 1 ? 's' : ''}, $errors error${errors != 1 ? 'es' : ''}',
+        );
       }
 
       // Recargar eventos
@@ -1270,13 +1240,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           subscription.calendarEventId = null;
           subscription.calendarId = null;
           await ref.read(subscriptionsProvider.notifier).updateSubscription(subscription);
-        }
-
-        if (mounted) {
-          SnackBarController.showSuccess(
-            context,
-            message: 'Recordatorio eliminado',
-          );
         }
 
         // Recargar eventos

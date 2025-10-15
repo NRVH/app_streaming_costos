@@ -188,9 +188,6 @@ class _CalendarDiagnosticDialogState extends State<CalendarDiagnosticDialog> {
                 .map((e) => '${e.key}: ${e.value}')
                 .join('\n');
             Clipboard.setData(ClipboardData(text: text));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Diagnóstico copiado al portapapeles')),
-            );
           },
           child: const Text('Copiar'),
         ),

@@ -61,13 +61,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
     if (mounted) {
       if (success) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Instalación iniciada. Sigue las instrucciones en pantalla.'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 5),
-          ),
-        );
       } else {
         setState(() {
           _isDownloading = false;
