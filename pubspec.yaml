@@ -1,7 +1,7 @@
 name: app_streaming_gastos
 description: Aplicación para gestionar gastos de suscripciones de streaming
 publish_to: 'none'
-version: 1.0.6+8
+version: 1.0.7+9
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -27,6 +27,10 @@ dependencies:
   http: ^1.2.0
   package_info_plus: ^5.0.1
   url_launcher: ^6.2.2
+  dio: ^5.4.0
+  path_provider: ^2.1.1
+  open_file: ^3.3.2
+  permission_handler: ^11.1.0
   
   # Iconos
   cupertino_icons: ^1.0.6

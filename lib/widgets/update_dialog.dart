@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io';
 import '../services/update_service.dart';
+import '../services/apk_installer_service.dart';
 
-class UpdateDialog extends StatelessWidget {
+class UpdateDialog extends StatefulWidget {
   final GithubRelease release;
   final String currentVersion;
 
@@ -12,6 +14,20 @@ class UpdateDialog extends StatelessWidget {
     required this.currentVersion,
   });
 
+  @override
+  State<UpdateDialog> createState() => _UpdateDialogState();
+}
+
+class _UpdateDialogState extends State<UpdateDialog> {
+  final ApkInstallerService _installerService = ApkInstallerService();
+  bool _isDownloading = false;
+
+  @override
+  void dispose() {
+    _installerService.dispose();
+    super.dispose();
+  }
+
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
@@ -19,11 +35,60 @@ class UpdateDialog extends StatelessWidget {
     }
   }
 
+  Future<void> _downloadAndInstall() async {
+    final updateService = UpdateService();
+    final apkUrl = updateService.getAndroidApkUrl(widget.release);
+
+    if (apkUrl == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se encontró el archivo APK en el release'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() {
+      _isDownloading = true;
+    });
+
+    final fileName = 'SubTrack-v${widget.release.version}.apk';
+    final success = await _installerService.downloadAndInstallApk(apkUrl, fileName);
+
+    if (mounted) {
+      if (success) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Instalación iniciada. Sigue las instrucciones en pantalla.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      } else {
+        setState(() {
+          _isDownloading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${_installerService.statusMessage.value}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final updateService = UpdateService();
-    final releaseNotes = updateService.formatReleaseNotes(release.body);
-    final publishedDate = updateService.formatPublishedDate(release.publishedAt);
+    final releaseNotes = updateService.formatReleaseNotes(widget.release.body);
+    final publishedDate = updateService.formatPublishedDate(widget.release.publishedAt);
+    final isAndroid = Platform.isAndroid;
 
     return AlertDialog(
       title: Row(
@@ -47,7 +112,7 @@ class UpdateDialog extends StatelessWidget {
               children: [
                 const Text('Actualización Disponible'),
                 Text(
-                  'Versión ${release.version}',
+                  'Versión ${widget.release.version}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.secondary,
                       ),
@@ -57,7 +122,9 @@ class UpdateDialog extends StatelessWidget {
           ),
         ],
       ),
-      content: SingleChildScrollView(
+      content: _isDownloading
+          ? _buildDownloadProgress()
+          : SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -80,7 +147,7 @@ class UpdateDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        currentVersion,
+                        widget.currentVersion,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -96,7 +163,7 @@ class UpdateDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        release.version,
+                        widget.release.version,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: Colors.green,
@@ -183,21 +250,108 @@ class UpdateDialog extends StatelessWidget {
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Ahora no'),
-        ),
-        FilledButton.icon(
-          onPressed: () {
-            Navigator.pop(context);
-            _launchUrl(release.htmlUrl);
+      actions: _isDownloading
+          ? [
+              TextButton(
+                onPressed: () {
+                  _installerService.cancelDownload();
+                  Navigator.pop(context);
+                },
+                child: const Text('Cancelar'),
+              ),
+            ]
+          : [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Ahora no'),
+              ),
+              if (!isAndroid)
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _launchUrl(widget.release.htmlUrl);
+                  },
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Ver en GitHub'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.amber,
+                    foregroundColor: Colors.black,
+                  ),
+                ),
+              if (isAndroid)
+                FilledButton.icon(
+                  onPressed: _downloadAndInstall,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Actualizar Ahora'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+            ],
+    );
+  }
+
+  Widget _buildDownloadProgress() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 16),
+        ValueListenableBuilder<double>(
+          valueListenable: _installerService.downloadProgress,
+          builder: (context, progress, child) {
+            return Column(
+              children: [
+                LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                ),
+                const SizedBox(height: 16),
+                ValueListenableBuilder<String>(
+                  valueListenable: _installerService.statusMessage,
+                  builder: (context, message, child) {
+                    return Text(
+                      message,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    );
+                  },
+                ),
+              ],
+            );
           },
-          icon: const Icon(Icons.open_in_new),
-          label: const Text('Ver en GitHub'),
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.amber,
-            foregroundColor: Colors.black,
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Colors.blue.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline,
+                color: Colors.blue,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'No cierres la app durante la descarga. Una vez completada, se abrirá automáticamente el instalador de Android.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.blue[700],
+                      ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
