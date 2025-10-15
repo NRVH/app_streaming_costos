@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Servicio para descargar e instalar APKs
 class ApkInstallerService {
@@ -21,6 +22,20 @@ class ApkInstallerService {
   /// Descarga e instala un APK desde una URL
   Future<bool> downloadAndInstallApk(String url, String fileName) async {
     try {
+      // Verificar y solicitar permiso para instalar paquetes (Android 8.0+)
+      if (Platform.isAndroid) {
+        final status = await Permission.requestInstallPackages.status;
+        if (!status.isGranted) {
+          statusMessage.value = 'Solicitando permiso de instalación...';
+          final result = await Permission.requestInstallPackages.request();
+          if (!result.isGranted) {
+            statusMessage.value = 'Permiso de instalación denegado';
+            downloadState.value = DownloadState.error;
+            return false;
+          }
+        }
+      }
+      
       downloadState.value = DownloadState.downloading;
       statusMessage.value = 'Preparando descarga...';
       downloadProgress.value = 0.0;
