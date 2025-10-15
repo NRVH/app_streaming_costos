@@ -6,6 +6,7 @@ import '../services/calendar_service.dart';
 import '../providers/subscriptions_provider.dart';
 import '../models/subscription_model.dart';
 import '../widgets/calendar_selector_dialog.dart';
+import '../widgets/no_calendar_help_dialog.dart';
 import '../utils/snackbar_controller.dart';
 import 'package:intl/intl.dart';
 
@@ -390,16 +391,41 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Asegúrate de tener la app de Calendario instalada en tu dispositivo',
-              style: TextStyle(fontSize: 12),
-            ),
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _loadCalendars,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Recargar calendarios'),
+            const Text(
+              'SubTrack necesita un calendario sincronizado con el sistema Android para funcionar.',
+              style: TextStyle(fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final shouldRetry = await showNoCalendarHelpDialog(context);
+                      if (shouldRetry == true && mounted) {
+                        await _loadCalendars();
+                      }
+                    },
+                    icon: const Icon(Icons.help_outline),
+                    label: const Text('¿Cómo configurar?'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _loadCalendars,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Reintentar'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

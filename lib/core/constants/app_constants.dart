@@ -6,7 +6,7 @@ class AppConstants {
   static const String appName = 'SubTrack';
 
   /// Versión de la aplicación
-  static const String appVersion = '1.0.7';
+  static const String appVersion = '1.0.8';
 
   /// Nombre de la base de datos Hive
   static const String hiveBoxSubscriptions = 'subscriptions';
