@@ -106,15 +106,9 @@ class ThemePreferencesNotifier extends StateNotifier<model.ThemePreferences> {
     await _savePreferences();
   }
 
-  /// Activa/desactiva el modo AMOLED (negro puro)
-  Future<void> setAmoledMode(bool enabled) async {
-    state = state.copyWith(useAmoledMode: enabled);
-    await _savePreferences();
-  }
-
-  /// Establece un color primario personalizado
-  Future<void> setPrimaryColor(Color? color) async {
-    state = state.copyWith(primaryColorValue: color?.value);
+  /// Establece el esquema de color
+  Future<void> setColorScheme(model.AppColorScheme colorScheme) async {
+    state = state.copyWith(colorScheme: colorScheme);
     await _savePreferences();
   }
 

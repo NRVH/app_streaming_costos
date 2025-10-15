@@ -151,7 +151,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
           ],
 
-          // Opciones adicionales
+          // Selector de color
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -161,32 +161,96 @@ class ThemeSettingsScreen extends ConsumerWidget {
                   Row(
                     children: [
                       Icon(
-                        Icons.tune,
+                        Icons.palette,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'Personalización',
+                        'Esquema de Color',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    secondary: const Icon(Icons.palette),
-                    title: const Text('Color dinámico'),
-                    subtitle: const Text('Usa el color del fondo de pantalla (Android 12+)'),
-                    value: themePrefs.useDynamicColor,
-                    onChanged: (value) => themeNotifier.setDynamicColor(value),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Selecciona el color principal de la aplicación',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
                   ),
-                  SwitchListTile(
-                    secondary: const Icon(Icons.brightness_1),
-                    title: const Text('Modo AMOLED'),
-                    subtitle: const Text('Negro puro para pantallas OLED'),
-                    value: themePrefs.useAmoledMode,
-                    onChanged: (value) => themeNotifier.setAmoledMode(value),
+                  const SizedBox(height: 16),
+                  
+                  // Grid de opciones de color
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    children: [
+                      _buildColorOption(
+                        context,
+                        themePrefs,
+                        themeNotifier,
+                        model.AppColorScheme.sakuraPink,
+                        'Rosa Sakura',
+                        const Color(0xFFFFB3D9),
+                        const Color(0xFFFF6B9D),
+                        const Color(0xFFFFF0F5),
+                      ),
+                      _buildColorOption(
+                        context,
+                        themePrefs,
+                        themeNotifier,
+                        model.AppColorScheme.oceanBlue,
+                        'Azul Océano',
+                        const Color(0xFF006494),
+                        const Color(0xFF0582CA),
+                        const Color(0xFF00A6FB),
+                      ),
+                      _buildColorOption(
+                        context,
+                        themePrefs,
+                        themeNotifier,
+                        model.AppColorScheme.forestGreen,
+                        'Verde Bosque',
+                        const Color(0xFF2D6A4F),
+                        const Color(0xFF40916C),
+                        const Color(0xFF52B788),
+                      ),
+                      _buildColorOption(
+                        context,
+                        themePrefs,
+                        themeNotifier,
+                        model.AppColorScheme.sunsetOrange,
+                        'Naranja Atardecer',
+                        const Color(0xFFFF6D00),
+                        const Color(0xFFFF9E00),
+                        const Color(0xFFFFBC42),
+                      ),
+                      _buildColorOption(
+                        context,
+                        themePrefs,
+                        themeNotifier,
+                        model.AppColorScheme.lavenderDream,
+                        'Lavanda Sueño',
+                        const Color(0xFF7209B7),
+                        const Color(0xFF9D4EDD),
+                        const Color(0xFFC77DFF),
+                      ),
+                      _buildColorOption(
+                        context,
+                        themePrefs,
+                        themeNotifier,
+                        model.AppColorScheme.mintFresh,
+                        'Menta Fresca',
+                        const Color(0xFF06FFA5),
+                        const Color(0xFF00D9A3),
+                        const Color(0xFF4DFFC3),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -195,7 +259,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
 
           const SizedBox(height: 16),
 
-          // Vista previa
+          // Color dinámico
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -205,12 +269,12 @@ class ThemeSettingsScreen extends ConsumerWidget {
                   Row(
                     children: [
                       Icon(
-                        Icons.preview,
+                        Icons.auto_awesome,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'Vista Previa',
+                        'Personalización Avanzada',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -218,59 +282,45 @@ class ThemeSettingsScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              child: const Icon(Icons.subscriptions, color: Colors.white),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Suscripción de Ejemplo',
-                                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  Text(
-                                    'Así se verá tu app',
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Chip(
-                              label: const Text('\$9.99'),
-                              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.wallpaper),
+                    title: const Text('Color dinámico'),
+                    subtitle: const Text('Usa el color del fondo de pantalla\n(Android 12+ con Material You)'),
+                    value: themePrefs.useDynamicColor,
+                    onChanged: (value) => themeNotifier.setDynamicColor(value),
+                    contentPadding: EdgeInsets.zero,
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Tema actual: ${themePrefs.modeDescription}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.secondary,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
+                  if (themePrefs.useDynamicColor)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'El color dinámico anula el esquema seleccionado arriba',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
+
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -339,6 +389,100 @@ class ThemeSettingsScreen extends ConsumerWidget {
                 Icons.check_circle,
                 color: Theme.of(context).colorScheme.primary,
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColorOption(
+    BuildContext context,
+    model.ThemePreferences prefs,
+    ThemePreferencesNotifier notifier,
+    model.AppColorScheme colorScheme,
+    String name,
+    Color color1,
+    Color color2,
+    Color color3,
+  ) {
+    final isSelected = prefs.colorScheme == colorScheme;
+
+    return InkWell(
+      onTap: () => notifier.setColorScheme(colorScheme),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.outlineVariant,
+            width: isSelected ? 3 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Tres círculos de colores
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: color1,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: color2,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: color3,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Nombre
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                name,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (isSelected) ...[
+              const SizedBox(height: 4),
+              Icon(
+                Icons.check_circle,
+                size: 16,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ],
           ],
         ),
       ),

@@ -21,6 +21,28 @@ enum ThemeMode {
   auto,       // Auto según hora del día (amanecer/atardecer)
 }
 
+/// Esquemas de color disponibles
+@HiveType(typeId: 5)
+enum AppColorScheme {
+  @HiveField(0)
+  sakuraPink,
+  
+  @HiveField(1)
+  oceanBlue,
+  
+  @HiveField(2)
+  forestGreen,
+  
+  @HiveField(3)
+  sunsetOrange,
+  
+  @HiveField(4)
+  lavenderDream,
+  
+  @HiveField(5)
+  mintFresh,
+}
+
 /// Preferencias de tema de la aplicación
 @HiveType(typeId: 4)
 class ThemePreferences extends HiveObject {
@@ -41,17 +63,13 @@ class ThemePreferences extends HiveObject {
   @HiveField(4)
   int darkEndMinute;
 
-  /// Color primario personalizado (opcional)
+  /// Esquema de color seleccionado
   @HiveField(5)
-  int? primaryColorValue;
+  AppColorScheme colorScheme;
 
   /// Usar color dinámico del sistema (Material You en Android 12+)
   @HiveField(6)
   bool useDynamicColor;
-
-  /// AMOLED mode - true black para pantallas OLED
-  @HiveField(7)
-  bool useAmoledMode;
 
   ThemePreferences({
     this.mode = ThemeMode.system,
@@ -59,9 +77,8 @@ class ThemePreferences extends HiveObject {
     this.darkStartMinute = 0,
     this.darkEndHour = 7,
     this.darkEndMinute = 0,
-    this.primaryColorValue,
-    this.useDynamicColor = true,
-    this.useAmoledMode = false,
+    this.colorScheme = AppColorScheme.sakuraPink,
+    this.useDynamicColor = false,
   });
 
   /// Determina si debe usar tema oscuro según las preferencias actuales
@@ -135,9 +152,8 @@ class ThemePreferences extends HiveObject {
     int? darkStartMinute,
     int? darkEndHour,
     int? darkEndMinute,
-    int? primaryColorValue,
+    AppColorScheme? colorScheme,
     bool? useDynamicColor,
-    bool? useAmoledMode,
   }) {
     return ThemePreferences(
       mode: mode ?? this.mode,
@@ -145,9 +161,26 @@ class ThemePreferences extends HiveObject {
       darkStartMinute: darkStartMinute ?? this.darkStartMinute,
       darkEndHour: darkEndHour ?? this.darkEndHour,
       darkEndMinute: darkEndMinute ?? this.darkEndMinute,
-      primaryColorValue: primaryColorValue ?? this.primaryColorValue,
+      colorScheme: colorScheme ?? this.colorScheme,
       useDynamicColor: useDynamicColor ?? this.useDynamicColor,
-      useAmoledMode: useAmoledMode ?? this.useAmoledMode,
     );
+  }
+  
+  /// Nombres legibles de esquemas de color
+  String getColorSchemeName() {
+    switch (colorScheme) {
+      case AppColorScheme.sakuraPink:
+        return 'Rosa Sakura';
+      case AppColorScheme.oceanBlue:
+        return 'Azul Océano';
+      case AppColorScheme.forestGreen:
+        return 'Verde Bosque';
+      case AppColorScheme.sunsetOrange:
+        return 'Naranja Atardecer';
+      case AppColorScheme.lavenderDream:
+        return 'Lavanda Sueño';
+      case AppColorScheme.mintFresh:
+        return 'Menta Fresca';
+    }
   }
 }

@@ -22,16 +22,15 @@ class ThemePreferencesAdapter extends TypeAdapter<ThemePreferences> {
       darkStartMinute: fields[2] as int,
       darkEndHour: fields[3] as int,
       darkEndMinute: fields[4] as int,
-      primaryColorValue: fields[5] as int?,
-      useDynamicColor: fields[6] as bool,
-      useAmoledMode: fields[7] as bool,
+      colorScheme: fields[5] as AppColorScheme? ?? AppColorScheme.sakuraPink,
+      useDynamicColor: fields[6] as bool? ?? false,
     );
   }
 
   @override
   void write(BinaryWriter writer, ThemePreferences obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.mode)
       ..writeByte(1)
@@ -43,11 +42,9 @@ class ThemePreferencesAdapter extends TypeAdapter<ThemePreferences> {
       ..writeByte(4)
       ..write(obj.darkEndMinute)
       ..writeByte(5)
-      ..write(obj.primaryColorValue)
+      ..write(obj.colorScheme)
       ..writeByte(6)
-      ..write(obj.useDynamicColor)
-      ..writeByte(7)
-      ..write(obj.useAmoledMode);
+      ..write(obj.useDynamicColor);
   }
 
   @override
@@ -111,6 +108,65 @@ class ThemeModeAdapter extends TypeAdapter<ThemeMode> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is ThemeModeAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class AppColorSchemeAdapter extends TypeAdapter<AppColorScheme> {
+  @override
+  final int typeId = 5;
+
+  @override
+  AppColorScheme read(BinaryReader reader) {
+    switch (reader.readByte()) {
+      case 0:
+        return AppColorScheme.sakuraPink;
+      case 1:
+        return AppColorScheme.oceanBlue;
+      case 2:
+        return AppColorScheme.forestGreen;
+      case 3:
+        return AppColorScheme.sunsetOrange;
+      case 4:
+        return AppColorScheme.lavenderDream;
+      case 5:
+        return AppColorScheme.mintFresh;
+      default:
+        return AppColorScheme.sakuraPink;
+    }
+  }
+
+  @override
+  void write(BinaryWriter writer, AppColorScheme obj) {
+    switch (obj) {
+      case AppColorScheme.sakuraPink:
+        writer.writeByte(0);
+        break;
+      case AppColorScheme.oceanBlue:
+        writer.writeByte(1);
+        break;
+      case AppColorScheme.forestGreen:
+        writer.writeByte(2);
+        break;
+      case AppColorScheme.sunsetOrange:
+        writer.writeByte(3);
+        break;
+      case AppColorScheme.lavenderDream:
+        writer.writeByte(4);
+        break;
+      case AppColorScheme.mintFresh:
+        writer.writeByte(5);
+        break;
+    }
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AppColorSchemeAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

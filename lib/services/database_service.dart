@@ -27,6 +27,9 @@ class DatabaseService {
     if (!Hive.isAdapterRegistered(4)) {
       Hive.registerAdapter(ThemePreferencesAdapter());
     }
+    if (!Hive.isAdapterRegistered(5)) {
+      Hive.registerAdapter(AppColorSchemeAdapter());
+    }
 
     // Abrir las cajas
     await Hive.openBox<Subscription>(_subscriptionsBox);

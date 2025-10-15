@@ -42,6 +42,9 @@ class MyApp extends ConsumerWidget {
     // Obtener el brightness del sistema
     final systemBrightness = MediaQuery.platformBrightnessOf(context);
     final currentBrightness = themeNotifier.getCurrentBrightness(systemBrightness);
+    
+    // Convertir el enum de theme_preferences al enum de app_theme
+    final appColorScheme = _convertToAppColorScheme(themePrefs.colorScheme);
 
     return MaterialApp(
       title: 'Mis Suscripciones',
@@ -49,11 +52,11 @@ class MyApp extends ConsumerWidget {
       
       // Temas
       theme: AppTheme.getLightTheme(
-        useAmoled: false,
+        colorScheme: appColorScheme,
         useDynamicColor: themePrefs.useDynamicColor,
       ),
       darkTheme: AppTheme.getDarkTheme(
-        useAmoled: themePrefs.useAmoledMode,
+        colorScheme: appColorScheme,
         useDynamicColor: themePrefs.useDynamicColor,
       ),
       themeMode: currentBrightness == Brightness.dark 
@@ -63,6 +66,28 @@ class MyApp extends ConsumerWidget {
       // Pantalla principal
       home: const MainNavigationScreen(),
     );
+  }
+  
+  /// Convierte el enum de theme_preferences al enum de app_theme
+  AppColorScheme _convertToAppColorScheme(dynamic colorScheme) {
+    // Mapear por nombre ya que son enums diferentes
+    final name = colorScheme.toString().split('.').last;
+    switch (name) {
+      case 'sakuraPink':
+        return AppColorScheme.sakuraPink;
+      case 'oceanBlue':
+        return AppColorScheme.oceanBlue;
+      case 'forestGreen':
+        return AppColorScheme.forestGreen;
+      case 'sunsetOrange':
+        return AppColorScheme.sunsetOrange;
+      case 'lavenderDream':
+        return AppColorScheme.lavenderDream;
+      case 'mintFresh':
+        return AppColorScheme.mintFresh;
+      default:
+        return AppColorScheme.sakuraPink;
+    }
   }
 }
 
