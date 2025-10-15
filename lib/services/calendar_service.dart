@@ -11,9 +11,16 @@ class CalendarService {
   /// Solicita permisos para acceder al calendario
   Future<bool> requestPermissions() async {
     try {
+      print('🔐 Solicitando permisos de calendario...');
       final permissionsGranted = await _calendarPlugin.requestPermissions();
-      return permissionsGranted.isSuccess && (permissionsGranted.data ?? false);
+      final result = permissionsGranted.isSuccess && (permissionsGranted.data ?? false);
+      print('   Resultado: $result');
+      if (!result) {
+        print('   ❌ Permisos denegados');
+      }
+      return result;
     } catch (e) {
+      print('❌ Error al solicitar permisos: $e');
       return false;
     }
   }
@@ -22,8 +29,10 @@ class CalendarService {
   Future<bool> hasPermissions() async {
     try {
       final permissionsGranted = await _calendarPlugin.hasPermissions();
-      return permissionsGranted.isSuccess && (permissionsGranted.data ?? false);
+      final result = permissionsGranted.isSuccess && (permissionsGranted.data ?? false);
+      return result;
     } catch (e) {
+      print('❌ Error al verificar permisos: $e');
       return false;
     }
   }
@@ -31,20 +40,102 @@ class CalendarService {
   /// Obtiene los calendarios disponibles
   Future<List<Calendar>> getCalendars() async {
     try {
+      print('');
+      print('═══════════════════════════════════════');
+      print('📅 DIAGNÓSTICO DE CALENDARIOS');
+      print('═══════════════════════════════════════');
+      
+      // Verificar permisos
+      print('🔐 Paso 1: Verificando permisos...');
       final hasPerms = await hasPermissions();
+      print('   Permisos existentes: $hasPerms');
+      
       if (!hasPerms) {
+        print('⚠️  Sin permisos, solicitando...');
         final granted = await requestPermissions();
-        if (!granted) return [];
+        print('   Permisos otorgados: $granted');
+        if (!granted) {
+          print('❌ PERMISOS DENEGADOS');
+          print('═══════════════════════════════════════');
+          return [];
+        }
       }
 
+      // Recuperar calendarios
+      print('');
+      print('📋 Paso 2: Recuperando calendarios del sistema...');
       final calendarsResult = await _calendarPlugin.retrieveCalendars();
-      if (calendarsResult.isSuccess && calendarsResult.data != null) {
-        return calendarsResult.data!
-            .where((cal) => cal.isReadOnly == false)
-            .toList();
+      
+      print('   isSuccess: ${calendarsResult.isSuccess}');
+      print('   hasData: ${calendarsResult.data != null}');
+      
+      if (!calendarsResult.isSuccess) {
+        print('❌ ERROR: retrieveCalendars falló');
+        print('═══════════════════════════════════════');
+        return [];
       }
-      return [];
-    } catch (e) {
+      
+      if (calendarsResult.data == null) {
+        print('❌ ERROR: No hay data en el resultado');
+        print('═══════════════════════════════════════');
+        return [];
+      }
+
+      final allCalendars = calendarsResult.data!;
+      print('   Total calendarios encontrados: ${allCalendars.length}');
+      
+      if (allCalendars.isEmpty) {
+        print('');
+        print('⚠️  NO HAY CALENDARIOS EN EL SISTEMA');
+        print('   Posibles causas:');
+        print('   1. No hay cuentas sincronizadas');
+        print('   2. Las cuentas no tienen calendarios');
+        print('   3. Los calendarios están ocultos');
+        print('═══════════════════════════════════════');
+        return [];
+      }
+
+      // Detalles de cada calendario
+      print('');
+      print('📊 Paso 3: Analizando calendarios...');
+      for (int i = 0; i < allCalendars.length; i++) {
+        final cal = allCalendars[i];
+        print('');
+        print('   Calendario #${i + 1}:');
+        print('   - ID: ${cal.id}');
+        print('   - Nombre: ${cal.name}');
+        print('   - Cuenta: ${cal.accountName}');
+        print('   - Tipo: ${cal.accountType}');
+        print('   - Solo lectura: ${cal.isReadOnly}');
+        print('   - Predeterminado: ${cal.isDefault}');
+        print('   - Color: ${cal.color}');
+      }
+
+      // Filtrar calendarios editables
+      final editableCalendars = allCalendars
+          .where((cal) => cal.isReadOnly == false)
+          .toList();
+      
+      print('');
+      print('✅ Calendarios editables: ${editableCalendars.length}');
+      
+      if (editableCalendars.isEmpty) {
+        print('');
+        print('⚠️  TODOS LOS CALENDARIOS SON DE SOLO LECTURA');
+        print('   Posibles causas:');
+        print('   1. Cuentas sin permisos de escritura');
+        print('   2. Calendarios compartidos (solo lectura)');
+        print('   3. Calendarios de suscripción (solo lectura)');
+      }
+      
+      print('═══════════════════════════════════════');
+      return editableCalendars;
+    } catch (e, stackTrace) {
+      print('');
+      print('❌ EXCEPCIÓN EN getCalendars():');
+      print('   Error: $e');
+      print('   Stack: ${stackTrace.toString().split('\n').take(5).join('\n')}');
+      print('═══════════════════════════════════════');
       return [];
     }
   }

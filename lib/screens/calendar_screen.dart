@@ -7,6 +7,7 @@ import '../providers/subscriptions_provider.dart';
 import '../models/subscription_model.dart';
 import '../widgets/calendar_selector_dialog.dart';
 import '../widgets/no_calendar_help_dialog.dart';
+import '../widgets/calendar_diagnostic_dialog.dart';
 import '../utils/snackbar_controller.dart';
 import 'package:intl/intl.dart';
 
@@ -414,18 +415,31 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _loadCalendars,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Reintentar'),
-                    style: FilledButton.styleFrom(
+                  child: OutlinedButton.icon(
+                    onPressed: () => showCalendarDiagnosticDialog(context),
+                    icon: const Icon(Icons.bug_report),
+                    label: const Text('Diagnóstico'),
+                    style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
+                      foregroundColor: Colors.purple,
                     ),
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _loadCalendars,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reintentar'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
             ),
           ],
         ),
