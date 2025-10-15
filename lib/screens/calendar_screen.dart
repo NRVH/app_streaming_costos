@@ -5,6 +5,8 @@ import 'package:timezone/timezone.dart' as tz;
 import '../services/calendar_service.dart';
 import '../providers/subscriptions_provider.dart';
 import '../models/subscription_model.dart';
+import '../widgets/calendar_selector_dialog.dart';
+import '../utils/snackbar_controller.dart';
 import 'package:intl/intl.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
@@ -110,67 +112,143 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   Future<void> _syncWithSubscriptions() async {
+    if (!_hasPermissions) {
+      SnackBarController.showError(
+        context,
+        message: 'Se requieren permisos de calendario',
+      );
+      return;
+    }
+
+    if (_selectedCalendarId == null) {
+      // Mostrar selector de calendario
+      final selected = await showCalendarSelector(
+        context,
+        currentCalendarId: _selectedCalendarId,
+      );
+      
+      if (selected != null) {
+        setState(() {
+          _selectedCalendarId = selected;
+        });
+      } else {
+        return; // Usuario canceló
+      }
+    }
+
     setState(() => _isLoading = true);
 
     try {
       final subscriptions = ref.read(subscriptionsProvider);
+      final activeReminders = subscriptions.where((s) => s.reminderEnabled).toList();
+      
+      if (activeReminders.isEmpty) {
+        if (mounted) {
+          SnackBarController.showInfo(
+            context,
+            message: 'No hay recordatorios activos para sincronizar',
+          );
+        }
+        setState(() => _isLoading = false);
+        return;
+      }
+
       int synced = 0;
       int errors = 0;
+      int skipped = 0;
 
-      for (final subscription in subscriptions) {
-        if (subscription.reminderEnabled) {
-          // Verificar si el evento existe
-          bool eventExists = false;
-          if (subscription.calendarEventId != null && subscription.calendarId != null) {
-            eventExists = await _calendarService.eventExists(
-              subscription.calendarEventId!,
-              subscription.calendarId!,
-            );
-          }
-
-          // Si no existe, crear uno nuevo
-          if (!eventExists) {
-            final calendarId = _selectedCalendarId ?? await _calendarService.getDefaultCalendarId();
-            if (calendarId != null) {
-              final eventId = await _calendarService.createReminder(
-                subscription,
-                calendarId: calendarId,
-              );
-
-              if (eventId != null) {
-                subscription.calendarEventId = eventId;
-                subscription.calendarId = calendarId;
-                await ref.read(subscriptionsProvider.notifier).updateSubscription(subscription);
-                synced++;
-              } else {
-                errors++;
-              }
-            }
-          }
+      for (final subscription in activeReminders) {
+        // Verificar si el evento existe
+        bool eventExists = false;
+        if (subscription.calendarEventId != null && subscription.calendarId != null) {
+          eventExists = await _calendarService.eventExists(
+            subscription.calendarEventId!,
+            subscription.calendarId!,
+          );
         }
+
+        // Si ya existe y está vinculado, omitir
+        if (eventExists) {
+          skipped++;
+          continue;
+        }
+
+        // Crear nuevo recordatorio
+        try {
+          final eventId = await _calendarService.createReminder(
+            subscription,
+            calendarId: _selectedCalendarId,
+          );
+
+          if (eventId != null) {
+            subscription.calendarEventId = eventId;
+            subscription.calendarId = _selectedCalendarId;
+            await ref.read(subscriptionsProvider.notifier).updateSubscription(subscription);
+            synced++;
+          } else {
+            errors++;
+          }
+        } catch (e) {
+          print('❌ Error al crear recordatorio para ${subscription.name}: $e');
+          errors++;
+        }
+
+        // Pequeña pausa para no saturar el sistema
+        await Future.delayed(const Duration(milliseconds: 100));
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sincronización completa: $synced creados, $errors errores'),
-            backgroundColor: errors > 0 ? Colors.orange : Colors.green,
-          ),
-        );
+        if (errors == 0 && synced > 0) {
+          SnackBarController.showSuccess(
+            context,
+            message: 'Sincronización completa: $synced recordatorio${synced != 1 ? 's' : ''} creado${synced != 1 ? 's' : ''}',
+          );
+        } else if (errors > 0 && synced > 0) {
+          SnackBarController.showWarning(
+            context,
+            message: '$synced creado${synced != 1 ? 's' : ''}, $errors error${errors != 1 ? 'es' : ''}',
+          );
+        } else if (errors > 0 && synced == 0) {
+          SnackBarController.showError(
+            context,
+            message: 'Error al crear recordatorios ($errors error${errors != 1 ? 'es' : ''})',
+            action: SnackBarAction(
+              label: 'Cambiar calendario',
+              onPressed: () async {
+                final selected = await showCalendarSelector(
+                  context,
+                  currentCalendarId: _selectedCalendarId,
+                );
+                if (selected != null) {
+                  setState(() {
+                    _selectedCalendarId = selected;
+                  });
+                  _syncWithSubscriptions();
+                }
+              },
+            ),
+          );
+        } else if (skipped > 0 && synced == 0) {
+          SnackBarController.showInfo(
+            context,
+            message: 'Todo al día: $skipped recordatorio${skipped != 1 ? 's' : ''} ya sincronizado${skipped != 1 ? 's' : ''}',
+          );
+        }
       }
 
       await _loadEvents();
     } catch (e) {
+      print('❌ Error en sincronización: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error al sincronizar con el calendario'),
-            backgroundColor: Colors.red,
-          ),
+        SnackBarController.showError(
+          context,
+          message: 'Error al sincronizar: ${e.toString()}',
         );
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -286,38 +364,161 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   Widget _buildCalendarSelector() {
-    if (_calendars.isEmpty) return const SizedBox.shrink();
+    if (_calendars.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange, width: 1),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.warning_amber, color: Colors.orange),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'No se encontraron calendarios',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Asegúrate de tener la app de Calendario instalada en tu dispositivo',
+              style: TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _loadCalendars,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Recargar calendarios'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final selectedCalendar = _calendars.firstWhere(
+      (c) => c.id == _selectedCalendarId,
+      orElse: () => _calendars.first,
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Calendario',
-            style: Theme.of(context).textTheme.titleSmall,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Calendario',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  final selected = await showCalendarSelector(
+                    context,
+                    currentCalendarId: _selectedCalendarId,
+                  );
+                  
+                  if (selected != null && selected != _selectedCalendarId) {
+                    setState(() {
+                      _selectedCalendarId = selected;
+                    });
+                    await _loadEvents();
+                    
+                    if (mounted) {
+                      SnackBarController.showSuccess(
+                        context,
+                        message: 'Calendario cambiado correctamente',
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.edit, size: 16),
+                label: const Text('Cambiar', style: TextStyle(fontSize: 12)),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: _selectedCalendarId,
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.calendar_month),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.primary,
+                width: 1,
               ),
             ),
-            items: _calendars.map((calendar) {
-              return DropdownMenuItem(
-                value: calendar.id,
-                child: Text(calendar.name ?? 'Sin nombre'),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedCalendarId = value;
-              });
-              _loadEvents();
-            },
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: selectedCalendar.color != null
+                        ? Color(selectedCalendar.color!)
+                        : Theme.of(context).colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.calendar_month, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        selectedCalendar.name ?? 'Sin nombre',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (selectedCalendar.accountName != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          selectedCalendar.accountName!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                        ),
+                      ],
+                      if (selectedCalendar.isDefault == true) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green, width: 1),
+                          ),
+                          child: const Text(
+                            'Predeterminado',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -784,23 +985,26 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$deleted recordatorios eliminados' + (errors > 0 ? ', $errors errores' : '')),
-            backgroundColor: errors > 0 ? Colors.orange : Colors.green,
-          ),
-        );
+        if (errors > 0) {
+          SnackBarController.showWarning(
+            context,
+            message: '$deleted eliminado${deleted != 1 ? 's' : ''}, $errors error${errors != 1 ? 'es' : ''}',
+          );
+        } else {
+          SnackBarController.showSuccess(
+            context,
+            message: '$deleted recordatorio${deleted != 1 ? 's' : ''} eliminado${deleted != 1 ? 's' : ''}',
+          );
+        }
       }
 
       // Recargar eventos
       await _loadEvents();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al eliminar: $e'),
-            backgroundColor: Colors.red,
-          ),
+        SnackBarController.showError(
+          context,
+          message: 'Error al eliminar recordatorios',
         );
       }
     } finally {
@@ -1029,11 +1233,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Recordatorio eliminado correctamente'),
-              backgroundColor: Colors.green,
-            ),
+          SnackBarController.showSuccess(
+            context,
+            message: 'Recordatorio eliminado',
           );
         }
 
@@ -1042,11 +1244,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al eliminar: $e'),
-            backgroundColor: Colors.red,
-          ),
+        SnackBarController.showError(
+          context,
+          message: 'Error al eliminar recordatorio',
         );
       }
     } finally {
